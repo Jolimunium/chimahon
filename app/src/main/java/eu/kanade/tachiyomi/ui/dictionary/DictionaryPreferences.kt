@@ -13,6 +13,8 @@ class DictionaryPreferences(
     fun popupWidth() = preferenceStore.getInt("pref_dictionary_popup_width", 300)
 
     fun popupHeight() = preferenceStore.getInt("pref_dictionary_popup_height", 360)
+
+    fun popupMode() = preferenceStore.getString("pref_dictionary_popup_mode", "floating")
     fun fontSize() = preferenceStore.getInt("pref_dictionary_font_size", 16)
     fun fontFamily() = preferenceStore.getString("pref_dictionary_font_family", "")
 
@@ -25,6 +27,8 @@ class DictionaryPreferences(
     fun showPitchNumber() = preferenceStore.getBoolean("pref_dict_show_pitch_number", true)
     fun showPitchText() = preferenceStore.getBoolean("pref_dict_show_pitch_text", true)
     fun showNavigationButtons() = preferenceStore.getBoolean("pref_dict_show_navigation_buttons", true)
+
+    fun autoKanaConversion() = preferenceStore.getBoolean("pref_dict_auto_kana_conversion", true)
 
     fun recursiveLookupMode() = preferenceStore.getString("pref_dict_recursive_lookup_mode", "tabs")
 

@@ -37,7 +37,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import chimahon.DictionaryStyle
@@ -161,7 +163,8 @@ data object DictionaryTab : Tab {
         val scope = rememberCoroutineScope()
         val sessionManager = remember { DictionarySessionManager() }
 
-        var query by remember { mutableStateOf("") }
+        var textFieldValue by remember { mutableStateOf(TextFieldValue("")) }
+        val query = textFieldValue.text
         var isLoading by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var hasSearched by remember { mutableStateOf(false) }
@@ -195,6 +198,7 @@ data object DictionaryTab : Tab {
         val popupFontSizePref by dictionaryPreferences.fontSize().collectAsState()
         val customCss by dictionaryPreferences.customCss().collectAsState()
         val wordAudioEnabled by dictionaryPreferences.wordAudioEnabled().collectAsState()
+        val autoKanaConversion by dictionaryPreferences.autoKanaConversion().collectAsState()
         // ── Lookup history stack ──────────────────────────────────────────────
         val lookupStack = remember { mutableStateListOf<TabLookupFrame>() }
         var activeTabIndex by remember { mutableIntStateOf(0) }
@@ -394,8 +398,24 @@ data object DictionaryTab : Tab {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
+                    value = textFieldValue,
+                    onValueChange = { newValue ->
+                        if (autoKanaConversion && newValue.composition == null) {
+                            val (convertedText, newCursor) = KanaConverter.toKanaIME(
+                                newValue.text, newValue.selection.start
+                            )
+                            textFieldValue = if (convertedText != newValue.text) {
+                                newValue.copy(
+                                    text = convertedText,
+                                    selection = TextRange(newCursor),
+                                )
+                            } else {
+                                newValue
+                            }
+                        } else {
+                            textFieldValue = newValue
+                        }
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .focusRequester(focusRequester),
@@ -409,7 +429,9 @@ data object DictionaryTab : Tab {
                     },
                     trailingIcon = {
                         if (query.isNotEmpty()) {
-                            IconButton(onClick = { query = "" }) {
+                            IconButton(onClick = {
+                                textFieldValue = TextFieldValue("")
+                            }) {
                                 Icon(
                                     imageVector = Icons.Outlined.Clear,
                                     contentDescription = stringResource(MR.strings.action_reset),

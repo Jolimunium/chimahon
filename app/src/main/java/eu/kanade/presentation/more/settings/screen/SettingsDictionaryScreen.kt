@@ -655,6 +655,11 @@ object SettingsDictionaryScreen : SearchableSettings {
                         }
                     },
                 ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = dictionaryPreferences.autoKanaConversion(),
+                    title = stringResource(KMR.strings.pref_dict_auto_kana_conversion),
+                    subtitle = stringResource(KMR.strings.pref_dict_auto_kana_conversion_summary),
+                ),
             ),
         )
     }
