@@ -5,6 +5,23 @@ All notable changes to Chimahon are documented here.
 The format follows a Keep a Changelog style and uses Semantic Versioning.
 
 
+## [v1.7.1]
+
+### Added
+- High-contrast E-ink mode for the dictionary popup.
+- Active profile selection in the Dictionary tab.
+- Advanced collapsible dictionary behavior in lookups.
+- Ability to rename dictionaries.
+
+### Changed
+- Reorderable dictionary list via drag-and-drop.
+- Refined dictionary popup positioning logic.
+
+### Fixed
+- Lookups for non-Japanese languages.
+- Dictionary profile overrides in the Novel Reader.
+
+
 ## [v1.7.0]
 
 ### Added
