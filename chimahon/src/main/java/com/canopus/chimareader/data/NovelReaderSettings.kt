@@ -15,7 +15,8 @@ enum class Theme {
     LIGHT,
     DARK,
     SEPIA,
-    CUSTOM
+    CUSTOM,
+    PURE_BLACK
 }
 
 enum class StatisticsAutostartMode {
@@ -53,7 +54,7 @@ class NovelReaderSettings(private val context: Context, private val namespace: S
     }
 
     private val dataStore = context.novelReaderDataStore
-    
+
     private fun androidx.datastore.preferences.core.Preferences.getSafeDouble(key: androidx.datastore.preferences.core.Preferences.Key<Double>, default: Double): Double {
         return try {
             this[key] ?: default

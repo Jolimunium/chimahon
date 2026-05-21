@@ -3,22 +3,27 @@ package com.canopus.chimareader.ui.reader
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.canopus.chimareader.data.FontManager
 import com.canopus.chimareader.data.Theme
-import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -80,37 +85,54 @@ fun AppearanceSheet(
             // Theme (moved to top)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Theme", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = viewModel.theme == Theme.SYSTEM,
-                        onClick = { viewModel.updateTheme(Theme.SYSTEM) },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 4)
-                    ) {
-                        Text("System")
-                    }
-                    SegmentedButton(
-                        selected = viewModel.theme == Theme.LIGHT,
-                        onClick = { viewModel.updateTheme(Theme.LIGHT) },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 4)
-                    ) {
-                        Text("Light")
-                    }
-                    SegmentedButton(
-                        selected = viewModel.theme == Theme.DARK,
-                        onClick = { viewModel.updateTheme(Theme.DARK) },
-                        shape = SegmentedButtonDefaults.itemShape(index = 2, count = 4)
-                    ) {
-                        Text("Dark")
-                    }
-                    SegmentedButton(
-                        selected = viewModel.theme == Theme.SEPIA,
-                        onClick = { viewModel.updateTheme(Theme.SEPIA) },
-                        shape = SegmentedButtonDefaults.itemShape(index = 3, count = 4)
-                    ) {
-                        Text("Sepia")
+                val themeOptions = listOf(Theme.SYSTEM, Theme.LIGHT, Theme.DARK, Theme.SEPIA, Theme.PURE_BLACK)
+                Surface(
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = RoundedCornerShape(17.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    tonalElevation = 0.dp,
+                ) {
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        themeOptions.forEachIndexed { index, option ->
+                            val selected = viewModel.theme == option
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxSize()
+                                    .clickable(enabled = !selected) { viewModel.updateTheme(option) }
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                        shape = if (selected) RoundedCornerShape(15.dp) else RoundedCornerShape(0.dp),
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                text = when (option) {
+                                    Theme.SYSTEM -> "System"
+                                    Theme.LIGHT -> "Light"
+                                    Theme.DARK -> "Dark"
+                                    Theme.SEPIA -> "Sepia"
+                                    Theme.PURE_BLACK -> "Pure Black"
+                                    else -> ""
+                                },
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                            if (index < themeOptions.lastIndex) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(1.dp)
+                                        .height(24.dp)
+                                        .align(Alignment.CenterVertically)
+                                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                )
+                            }
+                        }
                     }
                 }
-                
+
                 if (viewModel.theme == Theme.SYSTEM) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),

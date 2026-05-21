@@ -1,6 +1,7 @@
 package com.canopus.chimareader.ui.reader
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -23,8 +24,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.delay
-import android.util.Log
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -170,44 +169,25 @@ class ReaderViewModel(
     var systemLightSepia by mutableStateOf(false)
 
     // Tracks statistics for current reading session
-    var isTimerPaused by mutableStateOf(false)
-    var sessionReadingTime by mutableDoubleStateOf(0.0) // seconds
     var totalExploredCharCount by mutableIntStateOf(0)
-    var initialCharCount by mutableIntStateOf(0)
-    var lastSavedExploredCharCount = 0
-    var lastSavedSessionReadingTime = 0.0
 
-    val sessionCharactersRead: Int
-        get() = maxOf(0, totalExploredCharCount - initialCharCount)
-
-    private var lastPeriodicSaveTime = System.currentTimeMillis()
-
-    var fullStatistics = mutableStateListOf<Statistics>()
-
-    // Map of spineIndex -> accumulated character count (Hoshi Reader's currentTotal)
     val accumulatedCharCounts = androidx.compose.runtime.mutableStateMapOf<Int, Int>()
 
-    val todayCharactersRead: Int
-        get() {
-            val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-            val persistent = fullStatistics.find { it.dateKey == dateKey }?.charactersRead ?: 0
-            val sessionDelta = maxOf(0, totalExploredCharCount - lastSavedExploredCharCount)
-            return persistent + sessionDelta
-        }
+    val totalCharacters: Int
+        get() = accumulatedCharCounts[document.linearSpineItems.size] ?: 0
 
-    val todayReadingTime: Double
-        get() {
-            val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-            val persistent = fullStatistics.find { it.dateKey == dateKey }?.readingTime ?: 0.0
-            val sessionDelta = maxOf(0.0, sessionReadingTime - lastSavedSessionReadingTime)
-            return persistent + sessionDelta
-        }
+    val currentCharacter: Int
+        get() = totalExploredCharCount
 
-    val allTimeCharactersRead: Int
-        get() = fullStatistics.sumOf { it.charactersRead } + maxOf(0, totalExploredCharCount - lastSavedExploredCharCount)
+    val currentChapterEndCharacter: Int
+        get() = accumulatedCharCounts.getOrDefault(index + 1, 0)
 
-    val allTimeReadingTime: Double
-        get() = fullStatistics.sumOf { it.readingTime } + maxOf(0.0, sessionReadingTime - lastSavedSessionReadingTime)
+    var fullStatistics = mutableStateListOf<Statistics>()
+    private var lastPersistTimeMs = System.currentTimeMillis()
+
+    lateinit var statisticsTracker: ReaderStatisticsTracker
+    private var trackingLocked = false
+    private var appBackgrounded = false
 
     val bridge = WebViewBridge()
     val chapterCount = document.spine().items.size
@@ -252,41 +232,48 @@ class ReaderViewModel(
         index = bookmark?.chapterIndex ?: 0
         currentProgress = bookmark?.progress ?: 0.0
         totalExploredCharCount = calculateExploredCharCount(currentProgress)
-        initialCharCount = totalExploredCharCount
-        lastSavedExploredCharCount = initialCharCount
 
         val stats = BookStorage.loadStatistics(rootUrl)
         if (stats != null) {
             fullStatistics.addAll(stats)
-            
+
             // Migration: Heuristic to detect milliseconds stored as seconds
-            val migrated = fullStatistics.map { 
+            val migrated = fullStatistics.map {
                 val speed = if (it.readingTime > 0) (it.charactersRead / it.readingTime * 3600) else 10000.0
                 if (speed < 500.0 && it.readingTime > 0) {
                     Log.i("ReaderViewModel", "TTSU-STATS: Migrating entry '${it.dateKey}' from MS to Seconds (Speed: $speed)")
                     it.copy(readingTime = it.readingTime / 1000.0)
-                } else it
+                } else {
+                    it
+                }
             }
             fullStatistics.clear()
-            fullStatistics.addAll(migrated)
+            // Deduplicate: keep the entry with the latest lastStatisticModified per dateKey
+            val deduplicated = migrated.groupBy { it.dateKey }.mapValues { (_, entries) ->
+                entries.maxBy { it.lastStatisticModified }
+            }.values.toList()
+            fullStatistics.addAll(deduplicated)
         }
 
-        // Timer for readingTime
+        statisticsTracker = ReaderStatisticsTracker(
+            title = document.title ?: "Unknown",
+            initialStatistics = fullStatistics,
+            enabled = true,
+        )
+
         scope.launch {
             while (true) {
                 delay(1000)
-                if (!isTimerPaused) {
-                    sessionReadingTime += 1.0
+                if (!trackingLocked && !appBackgrounded) {
+                    statisticsTracker.update(totalExploredCharCount)
                 }
-                // Periodic save stats every 60 seconds (more frequent than progress sync)
-                if (System.currentTimeMillis() - lastPeriodicSaveTime >= 60000L) {
-                    savePersistentStatistics()
-                    lastPeriodicSaveTime = System.currentTimeMillis()
+                if (System.currentTimeMillis() - lastPersistTimeMs >= 60000L) {
+                    persistToDisk()
+                    lastPersistTimeMs = System.currentTimeMillis()
                 }
             }
         }
 
-        // Background calculation of accumulated character counts for TOC (Hoshi Reader style)
         scope.launch(Dispatchers.IO) {
             var runningTotal = 0
             for (i in 0 until document.linearSpineItems.size) {
@@ -394,15 +381,22 @@ class ReaderViewModel(
             Theme.LIGHT -> 0xFFFFFFFF.toInt() to 0xFF000000.toInt()
             Theme.DARK -> 0xFF121212.toInt() to 0xFFE0E0E0.toInt()
             Theme.SEPIA -> 0xFFF2E2C9.toInt() to 0xFF3C2C1C.toInt()
+            Theme.PURE_BLACK -> 0xFF000000.toInt() to 0xFFE0E0E0.toInt()
             Theme.CUSTOM -> customBackgroundColor to customTextColor
             Theme.SYSTEM -> {
                 val isDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
                 if (isDark) {
-                    if (systemLightSepia) 0xFF1C140C.toInt() to 0xFFF2E2C9.toInt() // Inverted Sepia
-                    else 0xFF121212.toInt() to 0xFFE0E0E0.toInt()
+                    if (systemLightSepia) {
+                        0xFF1C140C.toInt() to 0xFFF2E2C9.toInt() // Inverted Sepia
+                    } else {
+                        0xFF121212.toInt() to 0xFFE0E0E0.toInt()
+                    }
                 } else {
-                    if (systemLightSepia) 0xFFF2E2C9.toInt() to 0xFF3C2C1C.toInt() // Sepia
-                    else 0xFFFFFFFF.toInt() to 0xFF000000.toInt()
+                    if (systemLightSepia) {
+                        0xFFF2E2C9.toInt() to 0xFF3C2C1C.toInt() // Sepia
+                    } else {
+                        0xFFFFFFFF.toInt() to 0xFF000000.toInt()
+                    }
                 }
             }
         }
@@ -478,11 +472,11 @@ class ReaderViewModel(
     fun getSpineIndexForHref(href: String): Int? {
         val decodedHref = java.net.URLDecoder.decode(href.substringBefore('#').substringBefore('?'), "UTF-8")
         val fileName = decodedHref.substringAfterLast("/")
-        
+
         for (i in 0 until document.linearSpineItems.size) {
             val chapterHref = document.getChapterHref(i) ?: continue
             val chapterFileName = chapterHref.substringAfterLast("/")
-            
+
             if (chapterHref.endsWith(decodedHref) || chapterFileName == fileName) {
                 return i
             }
@@ -490,11 +484,14 @@ class ReaderViewModel(
         return null
     }
 
-    fun saveBookmark(progress: Double) {
+    fun saveBookmark(progress: Double, updateTracker: Boolean = true) {
         currentProgress = progress
         bridge.updateProgress(progress)
         persistBookmark(progress)
-        savePersistentStatistics()
+        if (updateTracker && !trackingLocked && !appBackgrounded) {
+            statisticsTracker.update(totalExploredCharCount)
+        }
+        persistToDisk()
     }
 
     fun nextChapter(): Boolean {
@@ -549,10 +546,15 @@ class ReaderViewModel(
         // change the index. persistBookmark() calls calculateExploredCharCount()
         // which uses the current index — if we change it first the delta is lost.
         persistBookmark(currentProgress)
-        savePersistentStatistics()
+        if (!trackingLocked && !appBackgrounded) {
+            statisticsTracker.update(totalExploredCharCount)
+        }
 
         index = newIndex
-        saveBookmark(progress)
+        // Reset tracker baseline to the new position so neither the timer loop
+        // nor the saveBookmark call below register a false delta from the jump.
+        statisticsTracker.resetBaseline(calculateExploredCharCount(progress))
+        saveBookmark(progress, updateTracker = false)
         getCurrentChapter()?.let { file ->
             // Create proper file URL with encoded path
             val fileUrl = "file://${file.absolutePath.replace("\\", "/")}"
@@ -587,42 +589,33 @@ class ReaderViewModel(
         )
     }
 
-    private fun savePersistentStatistics() {
-        val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-
-        val deltaChars = maxOf(0, totalExploredCharCount - lastSavedExploredCharCount)
-        val deltaTime = maxOf(0.0, sessionReadingTime - lastSavedSessionReadingTime)
-
-        if (deltaChars == 0 && deltaTime < 1.0) return
-
-        var dailyStats = fullStatistics.find { it.dateKey == dateKey }
-        if (dailyStats == null) {
-            dailyStats = Statistics(
-                title = document.title ?: "Unknown",
-                dateKey = dateKey,
-                lastStatisticModified = System.currentTimeMillis(),
-            )
-            fullStatistics.add(dailyStats)
+    fun setTrackingLocked(locked: Boolean) {
+        if (locked) {
+            if (statisticsTracker.state.isTracking) {
+                statisticsTracker.update(totalExploredCharCount)
+            }
+            trackingLocked = true
+        } else {
+            statisticsTracker.resetBaseline(totalExploredCharCount)
+            trackingLocked = false
         }
+    }
 
-        dailyStats.charactersRead += deltaChars
-        dailyStats.readingTime += deltaTime
-        dailyStats.lastStatisticModified = System.currentTimeMillis()
+    fun togglePause() {
+        statisticsTracker.togglePause(totalExploredCharCount)
+    }
 
-        // Update speeds
-        val charsPerSec = if (dailyStats.readingTime > 0) dailyStats.charactersRead / dailyStats.readingTime else 0.0
-        val speedPerHour = (charsPerSec * 3600).toInt()
-        // Ensure readingTime unit is seconds for SPEED calculation
-        // speed = chars / (time_in_seconds / 3600) = chars * 3600 / time_in_seconds
+    fun onAppBackgrounded() {
+        appBackgrounded = true
+    }
 
-        dailyStats.lastReadingSpeed = speedPerHour
-        dailyStats.maxReadingSpeed = maxOf(dailyStats.maxReadingSpeed, speedPerHour)
+    fun onAppForegrounded() {
+        statisticsTracker.resetBaseline(totalExploredCharCount)
+        appBackgrounded = false
+    }
 
-        // Persistence
-        BookStorage.saveStatistics(fullStatistics.toList(), rootUrl)
-        Log.d("ReaderViewModel", "Saved statistics locally. Chars read today: ${dailyStats.charactersRead}")
-
-        lastSavedExploredCharCount = totalExploredCharCount
-        lastSavedSessionReadingTime = sessionReadingTime
+    private fun persistToDisk() {
+        val stats = statisticsTracker.statisticsForPersistence()
+        BookStorage.saveStatistics(stats, rootUrl)
     }
 }

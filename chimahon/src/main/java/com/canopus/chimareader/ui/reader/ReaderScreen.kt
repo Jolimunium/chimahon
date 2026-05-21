@@ -5,9 +5,11 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.*
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
@@ -16,6 +18,9 @@ import androidx.compose.ui.layout.*
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.text.style.*
 import androidx.compose.ui.unit.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.canopus.chimareader.data.BookMetadata
 import com.canopus.chimareader.data.Statistics
 import kotlinx.coroutines.CancellationException
@@ -62,12 +67,13 @@ fun ReaderScreen(
     val systemLightSepia by settings.systemLightSepia.collectAsState(initial = false)
     val customBg by settings.customBackgroundColor.collectAsState(initial = 0xFFF2E2C9.toInt())
     val customTxt by settings.customTextColor.collectAsState(initial = 0xFF000000.toInt())
-    
+
     val initialSettings = remember(currentTheme, systemLightSepia, customBg, customTxt) {
         val (bg, txt) = when (currentTheme) {
             com.canopus.chimareader.data.Theme.LIGHT -> 0xFFFFFFFF.toInt() to 0xFF000000.toInt()
             com.canopus.chimareader.data.Theme.DARK -> 0xFF121212.toInt() to 0xFFE0E0E0.toInt()
             com.canopus.chimareader.data.Theme.SEPIA -> 0xFFF2E2C9.toInt() to 0xFF3C2C1C.toInt()
+            com.canopus.chimareader.data.Theme.PURE_BLACK -> 0xFF000000.toInt() to 0xFFE0E0E0.toInt()
             com.canopus.chimareader.data.Theme.CUSTOM -> customBg to customTxt
             com.canopus.chimareader.data.Theme.SYSTEM -> {
                 val isDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
@@ -130,11 +136,11 @@ fun ReaderScreen(
             .background(bgColor)
     ) {
         Log.d("ReaderScreen", "BoxWithConstraints: maxHeight=$maxHeight, maxWidth=$maxWidth")
-        
+
         // Capture initial height once, then use requiredHeight to override parent constraints
         var webViewHeightDp by remember { mutableStateOf<Dp?>(null) }
         val density = LocalDensity.current
-        
+
         val heightModifier = if (webViewHeightDp != null) {
             Modifier.requiredHeight(webViewHeightDp!!)
         } else {
@@ -147,14 +153,14 @@ fun ReaderScreen(
                     }
                 }
         }
-        
+
         ReaderThemedArea(currentSettings) {
             when (val state = loadState) {
                 ReaderLoadState.Loading -> ReaderMessage("Opening...", loading = true)
                 is ReaderLoadState.Error -> ReaderMessage(state.message)
                 is ReaderLoadState.Ready -> {
                     val viewModel = state.viewModel
-                    
+
                     val view = LocalView.current
                     DisposableEffect(viewModel.keepScreenOn) {
                         view.keepScreenOn = viewModel.keepScreenOn
@@ -170,13 +176,13 @@ fun ReaderScreen(
                             context = context,
                             rootDir = rootDir,
                             bridge = viewModel.bridge,
-                            loadChapter = { chapterIndex -> 
+                            loadChapter = { chapterIndex ->
                                 viewModel.jumpToChapter(chapterIndex)
                             },
                             getCurrentIndex = { viewModel.index }
                         )
                     }
-                    
+
                     DisposableEffect(Unit) {
                         onDispose {
                             viewModel.saveBookmark(viewModel.currentProgress)
@@ -221,68 +227,102 @@ fun ReaderScreen(
                         onInternalLinkClicked = { viewModel.jumpToUrl(it) },
                         onSelectionRectsReceived = onSelectionRectsReceived,
                     )
-
-                    // Top HUD
-                    AnimatedVisibility(
-                        visible = showHud,
-                        enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
-                        exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
-                        modifier = Modifier.align(Alignment.TopCenter)
-                    ) {
-                        ReaderTopBar(
-                            title = viewModel.document.title().orEmpty(),
-                            onBack = onBack,
-                            onToggleHud = { onShowHudChanged(false) },
-                            backgroundColor = currentSettings.backgroundColor,
-                            contentColor = currentSettings.textColor,
-                            modifier = Modifier
-                                .statusBarsPadding()
-                        )
-                    }
-
-                    // Bottom HUD
-                    AnimatedVisibility(
-                        visible = showHud,
-                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .windowInsetsPadding(WindowInsets.navigationBars)
-                    ) {
-                        ReaderBottomBar(
-                            focusMode = focusMode,
-                            progressText = "${(viewModel.currentProgress * 100).toInt()}%",
-                            backgroundColor = currentSettings.backgroundColor,
-                            contentColor = currentSettings.textColor,
-                            onToggleHud = { onShowHudChanged(false) },
-                            onToggleFocusMode = { focusMode = true },
-                            onOpenChapters = { activeSheet = ActiveSheet.Chapters },
-                            onOpenAppearance = { activeSheet = ActiveSheet.Appearance },
-                            onOpenStatistics = { activeSheet = ActiveSheet.Statistics },
-                            onOpenSasayaki = { activeSheet = ActiveSheet.Sasayaki }
-                        )
-                    }
                 }
             }
         }
-    }
-    
-    // Sheets outside the Box - true overlay that doesn't affect WebView size
-    when (val state = loadState) {
-        is ReaderLoadState.Ready -> {
-            val viewModel = state.viewModel
-            activeSheet?.let { sheet ->
-                ReaderThemedArea(viewModel.getReaderSettings(context)) {
-                    when (sheet) {
-                        ActiveSheet.Appearance -> AppearanceSheet(viewModel, additionalSettings) { activeSheet = null }
-                        ActiveSheet.Chapters -> ChapterListSheet(viewModel) { activeSheet = null }
-                        ActiveSheet.Statistics -> StatisticsSheet(viewModel) { activeSheet = null }
-                        ActiveSheet.Sasayaki -> SasayakiSheet(viewModel) { activeSheet = null }
+
+        // Overlays — direct BoxWithConstraints children (BoxScope available)
+        val readyVm = (loadState as? ReaderLoadState.Ready)?.viewModel
+
+        val lifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(lifecycleOwner, readyVm) {
+            if (readyVm == null) return@DisposableEffect onDispose {}
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_PAUSE -> readyVm.onAppBackgrounded()
+                    Lifecycle.Event.ON_RESUME -> readyVm.onAppForegrounded()
+                    else -> {}
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+
+        if (readyVm != null) {
+            // Persistent timer indicator (visible when HUD hidden and tracking active)
+            if (!showHud && readyVm.statisticsTracker.state.isTracking) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 8.dp, end = 8.dp)
+                        .size(8.dp)
+                        .background(Color(0xFF4CAF50), CircleShape)
+                )
+            }
+
+            // Top HUD
+            AnimatedVisibility(
+                visible = showHud,
+                enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
+                modifier = Modifier.align(Alignment.TopCenter)
+            ) {
+                ReaderTopBar(
+                    title = readyVm.document.title().orEmpty(),
+                    onBack = onBack,
+                    onToggleHud = { onShowHudChanged(false) },
+                    backgroundColor = currentSettings.backgroundColor,
+                    contentColor = currentSettings.textColor,
+                    modifier = Modifier
+                        .statusBarsPadding()
+                )
+            }
+
+            // Bottom HUD
+            AnimatedVisibility(
+                visible = showHud,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+            ) {
+                ReaderBottomBar(
+                    focusMode = focusMode,
+                    progressText = "${(readyVm.currentProgress * 100).toInt()}%",
+                    backgroundColor = currentSettings.backgroundColor,
+                    contentColor = currentSettings.textColor,
+                    onToggleHud = { onShowHudChanged(false) },
+                    onToggleFocusMode = { focusMode = true },
+                    onOpenChapters = { activeSheet = ActiveSheet.Chapters },
+                    onOpenAppearance = { activeSheet = ActiveSheet.Appearance },
+                    onOpenStatistics = { activeSheet = ActiveSheet.Statistics },
+                    onOpenSasayaki = { activeSheet = ActiveSheet.Sasayaki }
+                )
+            }
+        }
+
+        // Sheets outside the Box - true overlay that doesn't affect WebView size
+        when (val state = loadState) {
+            is ReaderLoadState.Ready -> {
+                val viewModel = state.viewModel
+                // Pause tracking while any sheet is open, resume when dismissed
+                LaunchedEffect(activeSheet) {
+                    viewModel.setTrackingLocked(activeSheet != null)
+                }
+                activeSheet?.let { sheet ->
+                    ReaderThemedArea(viewModel.getReaderSettings(context)) {
+                        when (sheet) {
+                            ActiveSheet.Appearance -> AppearanceSheet(viewModel, additionalSettings) { activeSheet = null }
+                            ActiveSheet.Chapters -> ChapterListSheet(viewModel) { activeSheet = null }
+                            ActiveSheet.Statistics -> StatisticsSheet(viewModel) { activeSheet = null }
+                            ActiveSheet.Sasayaki -> SasayakiSheet(viewModel) { activeSheet = null }
+                        }
                     }
                 }
             }
+            else -> {}
         }
-        else -> {}
     }
 }
 
@@ -313,7 +353,7 @@ private fun ReaderTopBar(
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack, 
+                    Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
                     tint = Color(contentColor)
                 )
@@ -356,7 +396,7 @@ private fun ReaderBottomBar(
             style = MaterialTheme.typography.bodyMedium,
             color = Color(contentColor).copy(alpha = 0.7f)
         )
-        
+
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             IconButton(onClick = onOpenChapters) {
                 Icon(
@@ -367,14 +407,14 @@ private fun ReaderBottomBar(
             }
             IconButton(onClick = onOpenAppearance) {
                 Icon(
-                    Icons.Default.Settings, 
+                    Icons.Default.Settings,
                     contentDescription = "Appearance",
                     tint = Color(contentColor)
                 )
             }
             IconButton(onClick = onOpenStatistics) {
                 Icon(
-                    Icons.Default.Info, 
+                    Icons.Outlined.QueryStats,
                     contentDescription = "Statistics",
                     tint = Color(contentColor)
                 )
@@ -407,7 +447,7 @@ private fun ReaderThemedArea(
 ) {
     val bgColor = Color(readerSettings.backgroundColor)
     val textColor = Color(readerSettings.textColor)
-    
+
     // Create a comprehensive ColorScheme based on the reader's background and text colors.
     // This overrides global app theme values while inside the themed area.
     val colorScheme = MaterialTheme.colorScheme.copy(
@@ -433,6 +473,6 @@ private fun ReaderThemedArea(
         surfaceContainerHigh = bgColor,
         surfaceContainerHighest = bgColor
     )
-    
+
     MaterialTheme(colorScheme = colorScheme, content = content)
 }

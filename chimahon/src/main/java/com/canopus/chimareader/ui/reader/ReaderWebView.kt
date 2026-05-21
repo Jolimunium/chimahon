@@ -64,7 +64,10 @@ fun ReaderWebView(
 
     val isFirstContinuous = remember { mutableStateOf(true) }
     LaunchedEffect(continuousMode) {
-        if (isFirstContinuous.value) { isFirstContinuous.value = false; return@LaunchedEffect }
+        if (isFirstContinuous.value) {
+            isFirstContinuous.value = false
+            return@LaunchedEffect
+        }
         bridge.chapterUrl?.let { url ->
             bridge.send(WebViewCommand.LoadChapter(url, bridge.progress))
         }
@@ -183,8 +186,11 @@ fun ReaderWebView(
                         view: WebView?,
                         detail: android.webkit.RenderProcessGoneDetail?,
                     ): Boolean {
-                        val reason = if (detail?.didCrash() == true) "WebView crashed"
-                        else "WebView killed by system (OOM)"
+                        val reason = if (detail?.didCrash() == true) {
+                            "WebView crashed"
+                        } else {
+                            "WebView killed by system (OOM)"
+                        }
                         Log.e("ReaderWebView", "onRenderProcessGone: $reason")
                         post {
                             onLoadFailed("Renderer died ($reason). Try disabling hardware acceleration or 'Avoid page breaks'.")
@@ -354,11 +360,11 @@ private class ReaderAndroidWebView(
 
     override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
         super.onScrollChanged(l, t, oldl, oldt)
-        
+
         if (isPopupActive) {
             onDismissPopupRequested()
         }
-        
+
         if (continuousMode && !isImageOnly) {
             val now = System.currentTimeMillis()
             if (now - lastProgressReportTime > 1000L) {
@@ -460,7 +466,7 @@ private class ReaderAndroidWebView(
     }
 
     fun loadChapter(url: String) {
-        Log.d("ReaderWebView", "loadChapter: url=$url size=${width}x${height}")
+        Log.d("ReaderWebView", "loadChapter: url=$url size=${width}x$height")
         currentUrl = url
 
         if (width <= 0 || height <= 0) {
@@ -487,8 +493,9 @@ private class ReaderAndroidWebView(
         try {
             if (url.startsWith("file://") || !url.contains("://")) {
                 val file = File(url.removePrefix("file://"))
-                if (file.exists()) loadUrl(url)
-                else {
+                if (file.exists()) {
+                    loadUrl(url)
+                } else {
                     Log.e("ReaderWebView", "File not found: $url")
                     onLoadFailed("File not found: $url")
                 }
@@ -545,7 +552,7 @@ private class ReaderAndroidWebView(
     """.trimIndent()
 
     fun injectReader() {
-        Log.d("ReaderWebView", "injectReader: ${width}x${height} continuous=$continuousMode imageOnly=$isImageOnly")
+        Log.d("ReaderWebView", "injectReader: ${width}x$height continuous=$continuousMode imageOnly=$isImageOnly")
 
         if (height <= 0 || width <= 0) {
             post { injectReader() }
@@ -744,9 +751,13 @@ private class ReaderAndroidWebView(
                 wrapper.style.setProperty('font-size', '${readerSettings.fontSize}px', 'important');
                 wrapper.style.setProperty('line-height', '${readerSettings.lineHeight}', 'important');
                 ${paragraphSpacingJS(readerSettings)}
-                ${if (readerSettings.layoutAdvanced) """
+                ${if (readerSettings.layoutAdvanced) {
+            """
                 wrapper.style.setProperty('letter-spacing', '${readerSettings.characterSpacing}em', 'important');
-                """ else ""}
+                """
+        } else {
+            ""
+        }}
                 wrapper.style.setProperty('text-align', ${if (readerSettings.justifyText) "'justify'" else "'left'"}, 'important');
 
                 ${fontJS(readerSettings, "wrapper")}
@@ -926,12 +937,17 @@ private class ReaderAndroidWebView(
                 wrapper.style.setProperty('font-size', '${readerSettings.fontSize}px', 'important');
                 wrapper.style.setProperty('line-height', '${readerSettings.lineHeight}', 'important');
                 ${paragraphSpacingJS(readerSettings)}
-                ${if (readerSettings.layoutAdvanced) """
+                ${if (readerSettings.layoutAdvanced) {
+            """
                 wrapper.style.setProperty('letter-spacing', '${readerSettings.characterSpacing}em', 'important');
-                """ else ""}
+                """
+        } else {
+            ""
+        }}
                 wrapper.style.setProperty('text-align', ${if (readerSettings.justifyText) "'justify'" else "'left'"}, 'important');
 
-                ${if (readerSettings.avoidPageBreak) """
+                ${if (readerSettings.avoidPageBreak) {
+            """
                 var abStyle = document.createElement('style');
                 abStyle.textContent = [
                     'img, svg, figure, table, tr, td, th,',
@@ -942,7 +958,10 @@ private class ReaderAndroidWebView(
                     '}'
                 ].join(' ');
                 document.head.appendChild(abStyle);
-                """ else ""}
+                """
+        } else {
+            ""
+        }}
 
                 ${fontJS(readerSettings, "wrapper")}
                 ${themeJS(bg, tc)}
@@ -1073,9 +1092,13 @@ private class ReaderAndroidWebView(
 
                 wrapper.style.setProperty('line-height', '${settings.lineHeight}', 'important');
                 ${paragraphSpacingJS(settings)}
-                ${if (settings.layoutAdvanced) """
+                ${if (settings.layoutAdvanced) {
+            """
                 wrapper.style.setProperty('letter-spacing', '${settings.characterSpacing}em', 'important');
-                """ else ""}
+                """
+        } else {
+            ""
+        }}
 
                 wrapper.style.setProperty('text-align', ${if (settings.justifyText) "'justify'" else "'left'"}, 'important');
 
@@ -1289,18 +1312,23 @@ private fun jsEscape(value: String): String = value
 private fun fontJS(settings: ReaderSettings, wrapperVar: String): String = buildString {
     val fontUrl = settings.fontUrl
     if (!fontUrl.isNullOrBlank()) {
-        appendLine("""
+        appendLine(
+            """
             var fontFace = document.createElement('style');
             fontFace.textContent = "@font-face { font-family: 'HoshiCustomFont'; src: url('${jsEscape(fontUrl)}'); }";
             document.head.appendChild(fontFace);
             document.fonts.ready.then(function() {
                 $wrapperVar.style.setProperty('font-family', 'HoshiCustomFont', 'important');
             });
-        """.trimIndent())
+            """.trimIndent(),
+        )
     } else {
         var ff = settings.selectedFont
-        if (ff == "System Serif") ff = "serif"
-        else if (ff == "System Sans-Serif") ff = "sans-serif"
+        if (ff == "System Serif") {
+            ff = "serif"
+        } else if (ff == "System Sans-Serif") {
+            ff = "sans-serif"
+        }
         appendLine("$wrapperVar.style.setProperty('font-family', '${jsEscape(ff)}', 'important');")
     }
 }
@@ -1311,7 +1339,8 @@ private fun themeJS(bg: String, tc: String): String = """
     document.documentElement.style.setProperty('background-color', '$bg', 'important');
 """.trimIndent()
 
-private fun furiganaJS(settings: ReaderSettings): String = if (settings.hideFurigana) """
+private fun furiganaJS(settings: ReaderSettings): String = if (settings.hideFurigana) {
+    """
     var furiganaStyle = document.getElementById('hoshi-furigana-style');
     if (!furiganaStyle) {
         furiganaStyle = document.createElement('style');
@@ -1319,21 +1348,24 @@ private fun furiganaJS(settings: ReaderSettings): String = if (settings.hideFuri
         furiganaStyle.textContent = 'rt { display: none !important; }';
         document.head.appendChild(furiganaStyle);
     }
-""".trimIndent() else """
+    """.trimIndent()
+} else {
+    """
     var furiganaStyle = document.getElementById('hoshi-furigana-style');
     if (furiganaStyle) furiganaStyle.remove();
-""".trimIndent()
+    """.trimIndent()
+}
 
 private fun ReaderSettings.resolvedBgHex(): String = when (theme) {
-    "dark"  -> "#1a1a1a"
+    "dark" -> "#1a1a1a"
     "sepia" -> "#f4ecd8"
     "light" -> "#ffffff"
-    else    -> "#${String.format("%06X", 0xFFFFFF and backgroundColor)}"
+    else -> "#${String.format("%06X", 0xFFFFFF and backgroundColor)}"
 }
 
 private fun ReaderSettings.resolvedTextHex(): String = when (theme) {
-    "dark"  -> "#ffffff"
+    "dark" -> "#ffffff"
     "sepia" -> "#5b4636"
     "light" -> "#000000"
-    else    -> "#${String.format("%06X", 0xFFFFFF and textColor)}"
+    else -> "#${String.format("%06X", 0xFFFFFF and textColor)}"
 }
