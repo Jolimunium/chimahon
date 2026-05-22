@@ -76,6 +76,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import chimahon.HoshiDicts
+import chimahon.dictionary.readDictionaryIndex
 import com.canopus.chimareader.data.FontManager
 import chimahon.anki.AnkiCardCreator
 import chimahon.anki.AnkiDroidBridge
@@ -84,6 +85,8 @@ import chimahon.anki.Marker
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.tachiyomi.data.dictionary.DictionaryUpdateJob
 import eu.kanade.tachiyomi.ui.dictionary.DictionaryPreferences
+import eu.kanade.tachiyomi.ui.dictionary.getDictionaryTitle
+import eu.kanade.tachiyomi.ui.dictionary.invalidateDictionaryTitle
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentMap
@@ -258,6 +261,9 @@ private fun loadDictionaryList(context: Context) {
     }
     Log.d(TAG, "loadDictionaryList: found ${names.size} dictionaries: $names")
     _dictionaryNames.value = names
+
+    // One-time cleanup: clear stale migration artifacts from a previous version.
+    Injekt.get<DictionaryPreferences>().clearMigrationArtifacts()
 }
 
 private val _isImporting = kotlinx.coroutines.flow.MutableStateFlow(false)
@@ -314,7 +320,7 @@ object SettingsDictionaryScreen : SearchableSettings {
                                 totalSize = cursor.getLong(0).coerceAtLeast(1L)
                             }
                         }
-                        
+
                         val tempFile = File(context.getExternalFilesDir(null), "word_audio.db.tmp")
                         context.contentResolver.openInputStream(uri)?.use { input ->
                             tempFile.outputStream().use { output ->
@@ -1072,16 +1078,17 @@ object SettingsDictionaryScreen : SearchableSettings {
             )
         }
 
-        dictToRename?.let { oldName ->
-            var newName by remember { mutableStateOf(oldName) }
+        dictToRename?.let { dirName ->
+            val currentDisplay = dictionaryPreferences.getDisplayName(dirName)
+            var newName by remember { mutableStateOf(currentDisplay ?: dirName) }
             AlertDialog(
                 onDismissRequest = { dictToRename = null },
-                title = { Text("Rename dictionary") },
+                title = { Text("Set display name") },
                 text = {
                     OutlinedTextField(
                         value = newName,
                         onValueChange = { newName = it },
-                        label = { Text("Dictionary name") },
+                        label = { Text("Display name") },
                         singleLine = true,
                     )
                 },
@@ -1090,53 +1097,18 @@ object SettingsDictionaryScreen : SearchableSettings {
                         onClick = {
                             if (newName.isNotBlank()) {
                                 val trimmedName = newName.trim()
-                                if (trimmedName != oldName) {
-                                    scope.launch {
-                                        val dictionariesDir = File(context.getExternalFilesDir(null), "dictionaries")
-                                        withContext(Dispatchers.IO) {
-                                            val typeSubdirs = listOf("term", "frequency", "pitch").map { File(dictionariesDir, it) }.filter { it.isDirectory }
-                                            var renamedAny = false
-                                            for (typeDir in typeSubdirs) {
-                                                val oldDir = File(typeDir, oldName)
-                                                if (!oldDir.isDirectory) continue
-                                                val newDir = File(typeDir, trimmedName)
-                                                if (newDir.exists()) continue
-                                                if (oldDir.renameTo(newDir)) {
-                                                    renamedAny = true
-                                                    val indexFile = File(newDir, "index.json")
-                                                    if (indexFile.exists()) {
-                                                        try {
-                                                            val json = org.json.JSONObject(indexFile.readText())
-                                                            json.put("title", trimmedName)
-                                                            indexFile.writeText(json.toString(2))
-                                                        } catch (e: Exception) {
-                                                            Log.e(TAG, "failed to update index.json title", e)
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            if (renamedAny) {
-                                                val freshProfile = profileStore.getActiveProfile()
-                                                val newOrder = freshProfile.dictionaryOrder.map { if (it == oldName) trimmedName else it }
-                                                val newEnabled = freshProfile.enabledDictionaries.map { if (it == oldName) trimmedName else it }.toSet()
-                                                val newDisplayModes = freshProfile.dictionaryDisplayModes.mapKeys { if (it.key == oldName) trimmedName else it.key }
-                                                profileStore.updateProfile(
-                                                    freshProfile.copy(
-                                                        dictionaryOrder = newOrder,
-                                                        enabledDictionaries = newEnabled,
-                                                        dictionaryDisplayModes = newDisplayModes,
-                                                    ),
-                                                )
-                                            }
-                                        }
-                                        loadDictionaryList(context)
-                                    }
+                                if (trimmedName != dirName) {
+                                    dictionaryPreferences.setDisplayName(dirName, trimmedName)
+                                } else {
+                                    dictionaryPreferences.setDisplayName(dirName, null)
                                 }
+                                invalidateDictionaryTitle(dirName)
+                                loadDictionaryList(context)
                                 dictToRename = null
                             }
                         },
                     ) {
-                        Text("Rename")
+                        Text("Save")
                     }
                 },
                 dismissButton = {
@@ -1168,23 +1140,70 @@ object SettingsDictionaryScreen : SearchableSettings {
                             )
                         }
 
-                        if (orderedDicts.isEmpty()) {
-                            Text(
-                                text = stringResource(MR.strings.pref_dict_none_imported),
-                                modifier = Modifier.padding(16.dp),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        } else {
-                            LazyColumn(
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            // Import button — always visible at the top
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp)
-                                    .heightIn(max = 10000.dp),
-                                state = dictListState,
-                                userScrollEnabled = false,
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                                    .clickable {
+                                        try {
+                                            importLauncher?.launch("application/zip")
+                                        } catch (_: ActivityNotFoundException) {
+                                            context.toast(MR.strings.file_picker_error)
+                                        }
+                                    },
                             ) {
-                                item(key = "collapse_behavior") {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.ImportExport,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = stringResource(MR.strings.pref_import_dictionary),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                        Text(
+                                            text = stringResource(MR.strings.pref_import_dictionary_summ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Outlined.KeyboardArrowRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                            }
+
+                            if (orderedDicts.isEmpty()) {
+                                Text(
+                                    text = stringResource(MR.strings.pref_dict_none_imported),
+                                    modifier = Modifier.padding(16.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp)
+                                        .heightIn(max = 10000.dp),
+                                    state = dictListState,
+                                    userScrollEnabled = false,
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    item(key = "collapse_behavior") {
                                     Surface(
                                         modifier = Modifier.fillMaxWidth(),
                                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
@@ -1415,52 +1434,6 @@ object SettingsDictionaryScreen : SearchableSettings {
 
                                 item { HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant) }
 
-                                item(key = "import_dict") {
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                try {
-                                                    importLauncher?.launch("application/zip")
-                                                } catch (_: ActivityNotFoundException) {
-                                                    context.toast(MR.strings.file_picker_error)
-                                                }
-                                            },
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.ImportExport,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(18.dp),
-                                            )
-                                            Spacer(Modifier.width(10.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = stringResource(MR.strings.pref_import_dictionary),
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                )
-                                                Text(
-                                                    text = stringResource(MR.strings.pref_import_dictionary_summ),
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                            Icon(
-                                                imageVector = Icons.Outlined.KeyboardArrowRight,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(18.dp),
-                                            )
-                                        }
-                                    }
-                                }
-
                                 @OptIn(ExperimentalFoundationApi::class)
                                 itemsIndexed(
                                     items = dictNamesState,
@@ -1491,8 +1464,9 @@ object SettingsDictionaryScreen : SearchableSettings {
                                                     modifier = Modifier.weight(1f),
                                                     verticalArrangement = Arrangement.spacedBy(4.dp),
                                                 ) {
+                                                    val displayTitle = getDictionaryTitle(context, dictName)
                                                     Text(
-                                                        text = dictName,
+                                                        text = displayTitle,
                                                         style = MaterialTheme.typography.bodyMedium,
                                                         modifier = Modifier.combinedClickable(
                                                             onClick = {},
@@ -1579,12 +1553,16 @@ object SettingsDictionaryScreen : SearchableSettings {
                                                 }
                                             }
                                     }
+                                 }
+
                                 }
 
                             }
                         }
+
                     }
-                    }
+                    
+                }
                 ),
             ),
         )
@@ -2355,13 +2333,13 @@ object SettingsDictionaryScreen : SearchableSettings {
         val scope = rememberCoroutineScope()
         val prefs = remember { Injekt.get<DictionaryPreferences>() }
         val json = remember { Injekt.get<kotlinx.serialization.json.Json>() }
-        
+
         val enabled by prefs.wordAudioEnabled().collectAsState()
         val autoplay by prefs.wordAudioAutoplay().collectAsState()
         val localEnabled by prefs.wordAudioLocalEnabled().collectAsState()
         val localPath by prefs.wordAudioLocalPath().collectAsState()
         val rawSources by prefs.wordAudioSources().collectAsState()
-        
+
         val sources = remember(rawSources) {
             try {
                 json.decodeFromString<List<chimahon.audio.WordAudioSource>>(rawSources)
@@ -2369,7 +2347,7 @@ object SettingsDictionaryScreen : SearchableSettings {
                 emptyList()
             }
         }
-        
+
         val updateSources: (List<chimahon.audio.WordAudioSource>) -> Unit = { newSources ->
             prefs.wordAudioSources().set(json.encodeToString(newSources))
         }
@@ -2409,9 +2387,9 @@ object SettingsDictionaryScreen : SearchableSettings {
                                     modifier = Modifier.padding(top = 8.dp)
                                 ) {
                                     OutlinedButton(
-                                        onClick = { 
+                                        onClick = {
                                             try {
-                                                pickDb.launch(arrayOf("*/*")) 
+                                                pickDb.launch(arrayOf("*/*"))
                                             } catch (e: Exception) {
                                                 context.toast("Error launching file picker")
                                                 Log.e(TAG, "pickDb launch error", e)
@@ -2455,7 +2433,7 @@ object SettingsDictionaryScreen : SearchableSettings {
                     content = {
                         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                             Text("Online Sources", style = MaterialTheme.typography.titleMedium)
-                            
+
                             // Sources List
                             sources.forEachIndexed { index, source ->
                                 Row(
@@ -2483,11 +2461,11 @@ object SettingsDictionaryScreen : SearchableSettings {
                                     }
                                 }
                             }
-                            
+
                             // Add Source UI
                             var newName by remember { mutableStateOf("") }
                             var newUrl by remember { mutableStateOf("") }
-                            
+
                             Column(modifier = Modifier.padding(top = 16.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(8.dp)) {
                                 Text("Add Source", style = MaterialTheme.typography.labelLarge)
                                 OutlinedTextField(

@@ -168,6 +168,56 @@ class DictionaryPreferences(
     fun legacyAnkiDefaultTags() = preferenceStore.getString("pref_anki_default_tags", "chimahon")
     fun legacyAnkiCropMode() = preferenceStore.getString("pref_dict_anki_crop_mode", "full")
 
+    // -------------------------------------------------------------------------
+    // Dictionary display names (dirName → displayName, stored as JSON map)
+    // -------------------------------------------------------------------------
+
+    fun displayNames() = preferenceStore.getString("pref_display_names", "{}")
+
+    /**
+     * Get display name for a directory, or null if none is set.
+     */
+    fun getDisplayName(dirName: String): String? {
+        val json = displayNames().get()
+        if (json.isBlank() || json == "{}") return null
+        return try {
+            org.json.JSONObject(json).optString(dirName, null)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Set display name for a directory. Pass null to remove it.
+     */
+    fun setDisplayName(dirName: String, displayName: String?) {
+        val json = displayNames().get()
+        val obj = try {
+            if (json.isBlank() || json == "{}") org.json.JSONObject()
+            else org.json.JSONObject(json)
+        } catch (_: Exception) {
+            org.json.JSONObject()
+        }
+        if (displayName != null) {
+            obj.put(dirName, displayName)
+        } else {
+            obj.remove(dirName)
+        }
+        displayNames().set(obj.toString())
+    }
+
+    /**
+     * One-time cleanup: clear stale migration artifacts from a previous version.
+     * Resets display names and removes the migration flag so it runs only once.
+     */
+    fun clearMigrationArtifacts() {
+        val migrated = preferenceStore.getBoolean("pref_display_names_migrated", false).get()
+        if (migrated) {
+            displayNames().set("{}")
+            preferenceStore.getBoolean("pref_display_names_migrated", false).set(false)
+        }
+    }
+
     /** Legacy global dictionary order — kept only to supply the initial migration list. */
     fun dictionaryOrder() = preferenceStore.getString("pref_dictionary_order", "")
 

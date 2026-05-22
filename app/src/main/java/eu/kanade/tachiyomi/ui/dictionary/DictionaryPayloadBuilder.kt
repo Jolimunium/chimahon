@@ -4,6 +4,7 @@ import android.content.Context
 import chimahon.DictionaryStyle
 import chimahon.LookupResult
 import chimahon.anki.AnkiProfile
+import eu.kanade.tachiyomi.ui.dictionary.DictionaryPreferences
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -12,6 +13,8 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import java.io.File
 
 /** Represents one entry in the scrollable lookup-history tab bar shown inside the WebView. */
@@ -237,20 +240,34 @@ internal fun String.toJavascriptExpression(): String =
 
 private val dictionaryTitleCache = java.util.concurrent.ConcurrentHashMap<String, String>()
 
+/** Invalidate the cached title for a single directory. Call when display name or index.json title changes. */
+internal fun invalidateDictionaryTitle(dirName: String) {
+    dictionaryTitleCache.remove(dirName)
+}
+
 internal fun getDictionaryTitle(context: Context, dirName: String): String {
     return dictionaryTitleCache.getOrPut(dirName) {
+        // 1. Display name (user-set custom name, survives updates)
+        val prefs = Injekt.get<DictionaryPreferences>()
+        val displayName = prefs.getDisplayName(dirName)
+        if (displayName != null) return@getOrPut displayName
+
+        // 2. index.json title
         val dictionariesDir = File(context.getExternalFilesDir(null), "dictionaries")
         for (type in listOf("term", "frequency", "pitch")) {
             val indexFile = File(File(dictionariesDir, type), "$dirName/index.json")
             if (indexFile.exists()) {
                 try {
                     val json = indexFile.readText()
-                    return@getOrPut org.json.JSONObject(json).optString("title", dirName)
+                    val title = org.json.JSONObject(json).optString("title", dirName)
+                    if (title.isNotBlank()) return@getOrPut title
                 } catch (_: Exception) {
-                    return@getOrPut dirName
+                    // fall through to dirName
                 }
             }
         }
+
+        // 3. Directory name (stable fallback)
         dirName
     }
 }
