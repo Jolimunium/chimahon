@@ -16,6 +16,7 @@ kotlin {
                 api(libs.injekt)
                 api(libs.rxjava)
                 api(libs.jsoup)
+                api(projects.sourceApi)
                 api(projects.i18n)
                 api(kotlinx.reflect)
                 implementation(project.dependencies.platform(compose.bom))
@@ -28,6 +29,11 @@ kotlin {
                 api(libs.preferencektx)
                 implementation(kotlinx.coroutines.android)
                 implementation(project.dependencies.platform(kotlinx.coroutines.bom))
+            }
+        }
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
             }
         }
     }
