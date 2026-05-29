@@ -128,7 +128,6 @@ class PagerPageHolder(
 
     private fun initProgressIndicator() {
         if (progressIndicator == null) {
-            if (!isAttachedToWindow) return
             progressIndicator = ReaderProgressIndicator(
                 context = context,
                 // KMK -->

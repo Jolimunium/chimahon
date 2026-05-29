@@ -11,6 +11,7 @@ import android.webkit.WebView
 import androidx.annotation.ColorInt
 import androidx.core.app.ActivityCompat
 import androidx.core.view.doOnLayout
+import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.WebtoonLayoutManager
@@ -348,11 +349,10 @@ class WebtoonViewer(
      */
     override fun setChapters(chapters: ViewerChapters) {
         val forceTransition = config.alwaysShowChapterTransition || currentPage is ChapterTransition
-        logcat { "setChapters: isGone=${recycler.visibility == View.GONE} isAttachedToWindow=${recycler.isAttachedToWindow} itemCount=${adapter.itemCount}" }
         adapter.setChapters(chapters, forceTransition)
 
-        if (recycler.visibility == View.GONE) {
-            logcat { "Recycler first layout: isAttachedToWindow=${recycler.isAttachedToWindow} pages=${chapters.currChapter.pages?.size}" }
+        if (recycler.isGone) {
+            logcat { "Recycler first layout" }
             val pages = chapters.currChapter.pages ?: return
             moveToPage(pages[min(chapters.currChapter.requestedPage, pages.lastIndex)])
             recycler.isVisible = true
