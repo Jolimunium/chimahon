@@ -511,6 +511,10 @@ class PagerPageHolder(
         }
     }
 
+    fun applyOcrOutlineVisible(visible: Boolean) {
+        ocrOutlineVisible = visible
+    }
+
     /**
      * Fetch OCR blocks for the current page(s) and remap coordinates to match the
      * bitmap that is actually displayed (crop / split / merge).

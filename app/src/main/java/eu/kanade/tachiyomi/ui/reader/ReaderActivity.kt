@@ -30,18 +30,24 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.core.view.isVisible
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +64,7 @@ import androidx.core.content.getSystemService
 import androidx.core.graphics.Insets
 import androidx.core.net.toUri
 import androidx.core.transition.doOnEnd
+import androidx.core.view.isVisible
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -470,6 +477,11 @@ class ReaderActivity : BaseActivity() {
                 }
 
                 ContentOverlay(state = state)
+
+                OcrProgressHud(
+                    visible = state.menuVisible,
+                    progress = state.ocrScanProgress,
+                )
 
                 AppBars(state = state)
             }
@@ -960,6 +972,14 @@ class ReaderActivity : BaseActivity() {
         val colorOverlayBlendMode = remember(colorOverlayMode) {
             ReaderPreferences.ColorFilterMode.getOrNull(colorOverlayMode)?.second
         }
+        val ocrOutlineVisible by readerPreferences.ocrOutlineVisible().collectAsState()
+
+        LaunchedEffect(state.viewer, ocrOutlineVisible) {
+            when (val viewer = state.viewer) {
+                is PagerViewer -> viewer.setOcrOutlineVisible(ocrOutlineVisible)
+                is WebtoonViewer -> viewer.setOcrOutlineVisible(ocrOutlineVisible)
+            }
+        }
 
         ReaderContentOverlay(
             brightness = state.brightnessOverlayValue,
@@ -969,6 +989,43 @@ class ReaderActivity : BaseActivity() {
 
         if (flashOnPageChange) {
             DisplayRefreshHost(hostState = displayRefreshHost)
+        }
+    }
+
+    @Composable
+    private fun BoxScope.OcrProgressHud(
+        visible: Boolean,
+        progress: ReaderViewModel.OcrScanProgress?,
+    ) {
+        AnimatedVisibility(
+            visible = visible && progress != null,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top = 12.dp, end = 12.dp),
+        ) {
+            val safeProgress = progress ?: return@AnimatedVisibility
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = "OCR ${safeProgress.completedPages}/${safeProgress.totalPages}",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
         }
     }
 
@@ -1058,6 +1115,7 @@ class ReaderActivity : BaseActivity() {
                 menuToggleToast = toast(if (enabled) MR.strings.on else MR.strings.off)
             },
             ocrEnabled = ocrEnabled,
+            ocrLoading = state.ocrScanProgress != null,
             onToggleOcr = {
                 val enabled = viewModel.toggleOcrEnabled()
                 if (enabled) {

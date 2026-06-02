@@ -320,6 +320,10 @@ class WebtoonPageHolder(
         }
     }
 
+    fun applyOcrOutlineVisible(visible: Boolean) {
+        frame.ocrOutlineVisible = visible
+    }
+
     private suspend fun loadOcrWithTransform(targetPage: ReaderPage) {
         try {
             val viewModel = viewer.activity.viewModel

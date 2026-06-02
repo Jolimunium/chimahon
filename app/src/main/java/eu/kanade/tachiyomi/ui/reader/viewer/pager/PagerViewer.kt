@@ -471,6 +471,14 @@ abstract class PagerViewer(
             }
     }
 
+    fun setOcrOutlineVisible(visible: Boolean) {
+        pager.children
+            .filterIsInstance(PagerPageHolder::class.java)
+            .forEach { holder ->
+                holder.applyOcrOutlineVisible(visible)
+            }
+    }
+
     /**
      * Called from the containing activity when a key [event] is received. It should return true
      * if the event was handled, false otherwise.

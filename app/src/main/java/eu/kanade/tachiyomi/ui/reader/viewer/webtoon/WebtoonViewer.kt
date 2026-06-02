@@ -453,6 +453,16 @@ class WebtoonViewer(
         }
     }
 
+    fun setOcrOutlineVisible(visible: Boolean) {
+        for (index in 0 until recycler.childCount) {
+            val child = recycler.getChildAt(index)
+            val holder = recycler.getChildViewHolder(child)
+            if (holder is WebtoonPageHolder) {
+                holder.applyOcrOutlineVisible(visible)
+            }
+        }
+    }
+
     /**
      * Called from the containing activity when a key [event] is received. It should return true
      * if the event was handled, false otherwise.
