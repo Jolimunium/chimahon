@@ -181,6 +181,7 @@ import androidx.compose.ui.graphics.Color as ComposeColor
 class ReaderActivity : BaseActivity() {
 
     companion object {
+        private val ocrProgressHudTopPadding = 76.dp
 
         fun newIntent(context: Context, mangaId: Long?, chapterId: Long?/* SY --> */, page: Int? = null/* SY <-- */): Intent {
             return Intent(context, ReaderActivity::class.java).apply {
@@ -1002,7 +1003,7 @@ class ReaderActivity : BaseActivity() {
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .statusBarsPadding()
-                .padding(top = 12.dp, end = 12.dp),
+                .padding(top = ocrProgressHudTopPadding, end = 12.dp),
         ) {
             val safeProgress = progress ?: return@AnimatedVisibility
             Surface(
