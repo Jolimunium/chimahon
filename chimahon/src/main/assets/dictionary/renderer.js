@@ -772,7 +772,7 @@
       // Skip interactive controls — buttons, dict tags, inflection toggles, etc.
       const target = e.target;
       if (!target) return;
-      if (target.closest('button, .anki-add-btn, .lookup-tab, .inflection-toggle, .tag, .dictionary-header')) return;
+      if (target.closest('button, .anki-add-btn, .lookup-tab, .inflection-toggle, .tag, .dictionary-header, summary')) return;
 
       const word = extractTextAtPoint(e.clientX, e.clientY);
       if (!word) return;
@@ -2222,11 +2222,8 @@
     article.className = 'entry';
     article.dataset.index = String(result.index || 0);
     
-    // Add data-dictionary attribute for scoped CSS
-    const dictName = result.term && result.term.glossaries && result.term.glossaries[0] && result.term.glossaries[0].dictName;
-    if (dictName) {
-      article.dataset.dictionary = dictName;
-    }
+    // data-dictionary is set on .dictionary-group (not on article) so that
+    // per-dictionary CSS selectors don't leak into the headword row.
 
     const body = document.createElement('div');
     body.className = 'entry-body';
