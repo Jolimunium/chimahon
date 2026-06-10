@@ -80,6 +80,9 @@ import eu.kanade.presentation.library.components.LibraryToolbarTitle
 import eu.kanade.presentation.manga.components.Button as BottomMenuButton
 import eu.kanade.tachiyomi.data.sync.SyncDataJob
 import chimahon.novel.ui.servers.NovelServerConfigScreen
+import chimahon.novel.manager.NovelSourceManager
+import chimahon.novel.ui.detail.NovelDetailScreen
+import eu.kanade.tachiyomi.sourcenovel.model.SNNovel
 import eu.kanade.tachiyomi.ui.category.NovelCategoryScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.util.system.toast
@@ -94,6 +97,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.domain.library.model.LibraryDisplayMode
+import tachiyomi.domain.novel.model.Novel
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.sy.SYMR
 import tachiyomi.presentation.core.components.CheckboxItem
@@ -246,6 +250,22 @@ fun Screen.NovelLibraryScreen(
                     } else {
                         val bookDir = com.canopus.chimareader.data.BookStorage.getBookDirectory(context, book.id)
                         com.canopus.chimareader.ui.reader.NovelReaderActivity.launch(context, bookDir)
+                    }
+                },
+                onClickSourceNovel = { novel ->
+                    val snNovel = SNNovel(
+                        url = novel.url,
+                        title = novel.title,
+                        author = novel.author,
+                        artist = novel.artist,
+                        description = novel.description,
+                        genre = novel.genre,
+                        status = novel.status.toInt(),
+                        thumbnail_url = novel.thumbnailUrl,
+                    )
+                    val screen = NovelDetailScreen.fromSourceId(snNovel, novel.source)
+                    if (screen != null) {
+                        navigator.push(screen)
                     }
                 },
             )
@@ -614,6 +634,7 @@ fun NovelLibraryContent(
     snackbarHostState: SnackbarHostState,
     onCategoryChange: (Int) -> Unit,
     onClickBook: (BookMetadata) -> Unit,
+    onClickSourceNovel: (Novel) -> Unit = {},
 ) {
     val pagerState = rememberPagerState(state.coercedActiveCategoryIndex) { state.displayedCategories.size }
     val scope = rememberCoroutineScope()
@@ -678,16 +699,16 @@ fun NovelLibraryContent(
                 verticalAlignment = Alignment.Top,
             ) { page ->
                 val category = state.displayedCategories[page]
-                val books = state.getBooksForCategory(category)
+                val items = state.getItemsForCategory(category)
 
-                if (books.isEmpty() && !state.searchQuery.isNullOrBlank()) {
+                if (items.isEmpty() && !state.searchQuery.isNullOrBlank()) {
                     EmptyScreen(
                         stringRes = MR.strings.no_results_found,
                         modifier = Modifier
                             .padding(bottom = contentPadding.calculateBottomPadding())
                             .padding(8.dp),
                     )
-                } else if (books.isEmpty()) {
+                } else if (items.isEmpty()) {
                     EmptyScreen(
                         stringRes = MR.strings.information_no_manga_category,
                         modifier = Modifier
@@ -699,54 +720,78 @@ fun NovelLibraryContent(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()) + PaddingValues(vertical = 8.dp),
                     ) {
-                        items(books, key = { it.id }) { book ->
-                            val isSelected = state.selection.contains(book.id)
-                            val coverData = tachiyomi.domain.manga.model.MangaCover(
-                                mangaId = book.id.hashCode().toLong(),
-                                sourceId = -1L,
-                                isMangaFavorite = true,
-                                ogUrl = book.cover,
-                                lastModified = 0L,
-                            )
-                            val onLongClick: () -> Unit = { screenModel.toggleSelection(book.id) }
+                        items(items, key = { it.id }) { item ->
+                            val isSelected = state.selection.contains(item.id)
+                            val onLongClick: () -> Unit = { screenModel.toggleSelection(item.id) }
                             val onClick: () -> Unit = {
                                 if (state.selectionMode) {
-                                    screenModel.toggleSelection(book.id)
+                                    screenModel.toggleSelection(item.id)
                                 } else {
-                                    onClickBook(book)
+                                    when (item) {
+                                        is NovelLibraryItem.LocalBook -> onClickBook(item.metadata)
+                                        is NovelLibraryItem.SourceNovel -> onClickSourceNovel(item.novel)
+                                    }
                                 }
                             }
 
-                            val bookLang = book.lang
-
-                            eu.kanade.presentation.library.components.MangaListItem(
-                                isSelected = isSelected,
-                                title = book.title ?: "",
-                                coverData = coverData,
-                                badge = {
-                                    if (!bookLang.isNullOrBlank()) {
-                                        eu.kanade.presentation.library.components.LanguageBadge(
-                                            isLocal = true,
-                                            sourceLanguage = bookLang,
-                                        )
-                                    }
-                                    if (book.isGhost) {
-                                        androidx.compose.material3.Surface(
-                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-                                            color = androidx.compose.material3.MaterialTheme.colorScheme.errorContainer,
-                                        ) {
-                                            androidx.compose.material3.Text(
-                                                text = "MISSING",
-                                                modifier = androidx.compose.ui.Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                                                style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
-                                                color = androidx.compose.material3.MaterialTheme.colorScheme.onErrorContainer,
-                                            )
-                                        }
-                                    }
-                                },
-                                onLongClick = onLongClick,
-                                onClick = onClick,
-                            )
+                            when (item) {
+                                is NovelLibraryItem.LocalBook -> {
+                                    val book = item.metadata
+                                    val coverData = tachiyomi.domain.manga.model.MangaCover(
+                                        mangaId = book.id.hashCode().toLong(),
+                                        sourceId = -1L,
+                                        isMangaFavorite = true,
+                                        ogUrl = book.cover,
+                                        lastModified = 0L,
+                                    )
+                                    eu.kanade.presentation.library.components.MangaListItem(
+                                        isSelected = isSelected,
+                                        title = book.title ?: "",
+                                        coverData = coverData,
+                                        badge = {
+                                            if (!book.lang.isNullOrBlank()) {
+                                                eu.kanade.presentation.library.components.LanguageBadge(
+                                                    isLocal = true,
+                                                    sourceLanguage = book.lang,
+                                                )
+                                            }
+                                            if (book.isGhost) {
+                                                androidx.compose.material3.Surface(
+                                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                                                    color = androidx.compose.material3.MaterialTheme.colorScheme.errorContainer,
+                                                ) {
+                                                    androidx.compose.material3.Text(
+                                                        text = "MISSING",
+                                                        modifier = androidx.compose.ui.Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                                        style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                                                        color = androidx.compose.material3.MaterialTheme.colorScheme.onErrorContainer,
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        onLongClick = onLongClick,
+                                        onClick = onClick,
+                                    )
+                                }
+                                is NovelLibraryItem.SourceNovel -> {
+                                    val novel = item.novel
+                                    val coverData = tachiyomi.domain.manga.model.MangaCover(
+                                        mangaId = novel.id,
+                                        sourceId = novel.source,
+                                        isMangaFavorite = true,
+                                        ogUrl = novel.thumbnailUrl,
+                                        lastModified = 0L,
+                                    )
+                                    eu.kanade.presentation.library.components.MangaListItem(
+                                        isSelected = isSelected,
+                                        title = novel.title,
+                                        coverData = coverData,
+                                        badge = {},
+                                        onLongClick = onLongClick,
+                                        onClick = onClick,
+                                    )
+                                }
+                            }
                         }
                     }
                 } else {
@@ -757,81 +802,113 @@ fun NovelLibraryContent(
                         horizontalArrangement = Arrangement.spacedBy(CommonMangaItemDefaults.GridHorizontalSpacer),
                         verticalArrangement = Arrangement.spacedBy(CommonMangaItemDefaults.GridVerticalSpacer),
                     ) {
-                        items(books, key = { it.id }) { book ->
-                            val isSelected = state.selection.contains(book.id)
-                            val coverData = tachiyomi.domain.manga.model.MangaCover(
-                                mangaId = book.id.hashCode().toLong(),
-                                sourceId = -1L,
-                                isMangaFavorite = true,
-                                ogUrl = book.cover,
-                                lastModified = 0L,
-                            )
-                            val onLongClick: () -> Unit = { screenModel.toggleSelection(book.id) }
+                        items(items, key = { it.id }) { item ->
+                            val isSelected = state.selection.contains(item.id)
+                            val onLongClick: () -> Unit = { screenModel.toggleSelection(item.id) }
                             val onClick: () -> Unit = {
                                 if (state.selectionMode) {
-                                    screenModel.toggleSelection(book.id)
+                                    screenModel.toggleSelection(item.id)
                                 } else {
-                                    onClickBook(book)
+                                    when (item) {
+                                        is NovelLibraryItem.LocalBook -> onClickBook(item.metadata)
+                                        is NovelLibraryItem.SourceNovel -> onClickSourceNovel(item.novel)
+                                    }
                                 }
                             }
 
-                            val bookTitle = if (displayMode == LibraryDisplayMode.CoverOnlyGrid) null else (book.title ?: "")
-                            val bookLang = book.lang
-
-                            val ghostBadge: @Composable (androidx.compose.foundation.layout.RowScope.() -> Unit)? =
-                                if (book.isGhost) {
+                            val title = if (displayMode == LibraryDisplayMode.CoverOnlyGrid) null else item.title
+                            val langBadge: @Composable (androidx.compose.foundation.layout.RowScope.() -> Unit)? =
+                                if (item is NovelLibraryItem.LocalBook && !item.metadata.lang.isNullOrBlank()) {
                                     {
-                                        androidx.compose.material3.Surface(
-                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-                                            color = androidx.compose.material3.MaterialTheme.colorScheme.errorContainer,
-                                        ) {
-                                            androidx.compose.material3.Text(
-                                                text = "MISSING",
-                                                modifier = androidx.compose.ui.Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                                                style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
-                                                color = androidx.compose.material3.MaterialTheme.colorScheme.onErrorContainer,
-                                            )
-                                        }
+                                        eu.kanade.presentation.library.components.LanguageBadge(
+                                            isLocal = true,
+                                            sourceLanguage = item.metadata.lang,
+                                        )
                                     }
-                                } else {
-                                    null
-                                }
+                                } else null
 
-                            if (displayMode == LibraryDisplayMode.ComfortableGrid) {
-                                eu.kanade.presentation.library.components.MangaComfortableGridItem(
-                                    isSelected = isSelected,
-                                    title = bookTitle ?: "",
-                                    coverData = coverData,
-                                    coverBadgeStart = {
-                                        if (!bookLang.isNullOrBlank()) {
-                                            eu.kanade.presentation.library.components.LanguageBadge(
-                                                isLocal = true,
-                                                sourceLanguage = bookLang,
-                                            )
-                                        }
-                                    },
-                                    coverBadgeEnd = ghostBadge,
-                                    onLongClick = onLongClick,
-                                    onClick = onClick,
-                                    usePanoramaCover = false,
-                                )
-                            } else {
-                                eu.kanade.presentation.library.components.MangaCompactGridItem(
-                                    isSelected = isSelected,
-                                    title = bookTitle,
-                                    coverData = coverData,
-                                    coverBadgeStart = {
-                                        if (!bookLang.isNullOrBlank()) {
-                                            eu.kanade.presentation.library.components.LanguageBadge(
-                                                isLocal = true,
-                                                sourceLanguage = bookLang,
-                                            )
-                                        }
-                                    },
-                                    coverBadgeEnd = ghostBadge,
-                                    onLongClick = onLongClick,
-                                    onClick = onClick,
-                                )
+                            when (item) {
+                                is NovelLibraryItem.LocalBook -> {
+                                    val book = item.metadata
+                                    val coverData = tachiyomi.domain.manga.model.MangaCover(
+                                        mangaId = book.id.hashCode().toLong(),
+                                        sourceId = -1L,
+                                        isMangaFavorite = true,
+                                        ogUrl = book.cover,
+                                        lastModified = 0L,
+                                    )
+                                    val ghostBadge: @Composable (androidx.compose.foundation.layout.RowScope.() -> Unit)? =
+                                        if (book.isGhost) {
+                                            {
+                                                androidx.compose.material3.Surface(
+                                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                                                    color = androidx.compose.material3.MaterialTheme.colorScheme.errorContainer,
+                                                ) {
+                                                    androidx.compose.material3.Text(
+                                                        text = "MISSING",
+                                                        modifier = androidx.compose.ui.Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                                        style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                                                        color = androidx.compose.material3.MaterialTheme.colorScheme.onErrorContainer,
+                                                    )
+                                                }
+                                            }
+                                        } else null
+
+                                    if (displayMode == LibraryDisplayMode.ComfortableGrid) {
+                                        eu.kanade.presentation.library.components.MangaComfortableGridItem(
+                                            isSelected = isSelected,
+                                            title = title ?: "",
+                                            coverData = coverData,
+                                            coverBadgeStart = langBadge,
+                                            coverBadgeEnd = ghostBadge,
+                                            onLongClick = onLongClick,
+                                            onClick = onClick,
+                                            usePanoramaCover = false,
+                                        )
+                                    } else {
+                                        eu.kanade.presentation.library.components.MangaCompactGridItem(
+                                            isSelected = isSelected,
+                                            title = title,
+                                            coverData = coverData,
+                                            coverBadgeStart = langBadge,
+                                            coverBadgeEnd = ghostBadge,
+                                            onLongClick = onLongClick,
+                                            onClick = onClick,
+                                        )
+                                    }
+                                }
+                                is NovelLibraryItem.SourceNovel -> {
+                                    val novel = item.novel
+                                    val coverData = tachiyomi.domain.manga.model.MangaCover(
+                                        mangaId = novel.id,
+                                        sourceId = novel.source,
+                                        isMangaFavorite = true,
+                                        ogUrl = novel.thumbnailUrl,
+                                        lastModified = 0L,
+                                    )
+                                    if (displayMode == LibraryDisplayMode.ComfortableGrid) {
+                                        eu.kanade.presentation.library.components.MangaComfortableGridItem(
+                                            isSelected = isSelected,
+                                            title = title ?: novel.title,
+                                            coverData = coverData,
+                                            coverBadgeStart = langBadge,
+                                            coverBadgeEnd = null,
+                                            onLongClick = onLongClick,
+                                            onClick = onClick,
+                                            usePanoramaCover = false,
+                                        )
+                                    } else {
+                                        eu.kanade.presentation.library.components.MangaCompactGridItem(
+                                            isSelected = isSelected,
+                                            title = title,
+                                            coverData = coverData,
+                                            coverBadgeStart = langBadge,
+                                            coverBadgeEnd = null,
+                                            onLongClick = onLongClick,
+                                            onClick = onClick,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
