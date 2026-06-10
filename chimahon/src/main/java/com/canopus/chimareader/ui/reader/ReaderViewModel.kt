@@ -19,12 +19,17 @@ import com.canopus.chimareader.data.Statistics
 import com.canopus.chimareader.data.Theme
 import com.canopus.chimareader.data.epub.EpubBook
 import com.canopus.chimareader.data.epub.SpineItemType
+import com.canopus.chimareader.ttusync.SyncDirection
+import com.canopus.chimareader.ttusync.SyncResult
+import com.canopus.chimareader.ttusync.TtuSyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -171,6 +176,13 @@ class ReaderViewModel(
     var keepScreenOn by mutableStateOf(false)
     var systemLightSepia by mutableStateOf(false)
 
+    private val ttuSyncManager: TtuSyncManager? by lazy {
+        try { Injekt.get<TtuSyncManager>() } catch (_: Exception) { null }
+    }
+    private var syncExportJob: kotlinx.coroutines.Job? = null
+    var isSyncing: Boolean = false
+    var inactiveSinceMillis: Long? = null
+
     // Tracks statistics for current reading session
     var totalExploredCharCount by mutableIntStateOf(0)
 
@@ -285,6 +297,20 @@ class ReaderViewModel(
         }
 
         scope.launch(Dispatchers.IO) {
+            val sync = ttuSyncManager
+            while (sync != null) {
+                val intervalMins = sync.autoSyncIntervalMins
+                delay(intervalMins * 60 * 1000L)
+                if (sync.isEnabled && sync.autoSyncPeriodic && !trackingLocked && !appBackgrounded) {
+                    val metadata = BookStorage.loadMetadata(rootUrl)
+                    if (metadata != null) {
+                        sync.syncBook(metadata, SyncDirection.AUTO)
+                    }
+                }
+            }
+        }
+
+        scope.launch(Dispatchers.IO) {
             var runningTotal = 0
             for (i in 0 until document.linearSpineItems.size) {
                 accumulatedCharCounts[i] = runningTotal
@@ -361,6 +387,8 @@ class ReaderViewModel(
         scope.launch {
             settings.systemLightSepia.collect { systemLightSepia = it }
         }
+
+        syncOnOpen()
     }
 
     fun updateTheme(value: Theme) = scope.launch { settings.setTheme(value) }
@@ -509,6 +537,61 @@ class ReaderViewModel(
             statisticsTracker.update(totalExploredCharCount)
         }
         persistToDisk()
+        scheduleSyncExport()
+    }
+
+    fun syncOnOpen() {
+        // Handled synchronously in ReaderScreen if enabled
+    }
+
+    fun syncAfterForeground() {
+        if (isSyncing) return
+        val sync = ttuSyncManager?.takeIf { it.isEnabled && it.autoSyncEnabled } ?: return
+        isSyncing = true
+        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val metadata = BookStorage.loadMetadata(rootUrl) ?: return@launch
+                val result = sync.syncBook(metadata, importOnly = true)
+                if (result is SyncResult.Imported) {
+                    reloadAfterImport()
+                    getCurrentChapter()?.let { file ->
+                        val fileUrl = "file://${file.absolutePath.replace("\\", "/")}"
+                        val chapterTitle = getCurrentChapterTitle()
+                        bridge.updateState(fileUrl, currentProgress, chapterTitle)
+                        bridge.send(WebViewCommand.LoadChapter(fileUrl, currentProgress))
+                    }
+                }
+            } finally {
+                isSyncing = false
+            }
+        }
+    }
+
+    fun scheduleSyncExport() {
+        // Debounced sync on page turns is disabled. Sync is handled periodic and on book close.
+    }
+
+    fun flushSyncExport() {
+        val sync = ttuSyncManager ?: return
+        if (!sync.isEnabled || !sync.autoSyncOnClose) return
+        syncExportJob?.cancel()
+        syncExportJob = scope.launch(Dispatchers.IO) {
+            val metadata = BookStorage.loadMetadata(rootUrl) ?: return@launch
+            sync.syncBook(metadata, SyncDirection.AUTO)
+        }
+    }
+
+    private fun reloadAfterImport() {
+        val bookmark = BookStorage.loadBookmark(rootUrl)
+        if (bookmark != null) {
+            index = bookmark.chapterIndex
+            currentProgress = bookmark.progress
+        }
+        fullStatistics.clear()
+        val stats = BookStorage.loadStatistics(rootUrl)
+        if (stats != null) {
+            fullStatistics.addAll(stats)
+        }
     }
 
     fun nextChapter(): Boolean {
@@ -615,6 +698,7 @@ class ReaderViewModel(
         lastSavedChapterIndex = index
         lastSavedProgress = progress
         lastSavedCharacterCount = characterCount
+        scheduleSyncExport()
     }
 
     fun setTrackingLocked(locked: Boolean) {
@@ -645,6 +729,7 @@ class ReaderViewModel(
     private fun persistToDisk() {
         val stats = statisticsTracker.statisticsForPersistence()
         BookStorage.saveStatistics(stats, rootUrl)
+        scheduleSyncExport()
     }
 
     companion object {
