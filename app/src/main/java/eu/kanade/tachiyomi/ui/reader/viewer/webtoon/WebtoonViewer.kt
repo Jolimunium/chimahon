@@ -299,8 +299,13 @@ class WebtoonViewer(
             activity.binding.navigationOverlay.setNavigation(config.navigator, showOnStart)
         }
 
+        config.eInkModeChangedListener = {
+            frame.eInkMode = it
+        }
+
         frame.layoutParams = ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
         frame.addView(recycler)
+        frame.eInkMode = config.eInkMode
     }
 
     private fun checkAllowPreload(page: ReaderPage?): Boolean {
@@ -420,7 +425,7 @@ class WebtoonViewer(
      * Scrolls up by [scrollDistance].
      */
     private fun scrollUp() {
-        if (config.usePageTransitions) {
+        if (config.usePageTransitions && !config.eInkMode) {
             recycler.smoothScrollBy(0, -scrollDistance)
         } else {
             recycler.scrollBy(0, -scrollDistance)
@@ -431,6 +436,11 @@ class WebtoonViewer(
      * Scrolls one screen over a period of time
      */
     fun linearScroll(duration: Duration) {
+        if (config.eInkMode) {
+            scrollDown()
+            return
+        }
+
         recycler.smoothScrollBy(
             0,
             activity.resources.displayMetrics.heightPixels,
@@ -451,7 +461,7 @@ class WebtoonViewer(
                 val position = adapter.items.indexOf(currentPage)
                 val nextItem = adapter.items.getOrNull(position + 1)
                 if (nextItem is ReaderPage) {
-                    if (config.usePageTransitions) {
+                    if (config.usePageTransitions && !config.eInkMode) {
                         recycler.smoothScrollToPosition(position + 1)
                     } else {
                         recycler.scrollToPosition(position + 1)
@@ -465,7 +475,7 @@ class WebtoonViewer(
 
     private fun scrollDownBy() {
         // SY <--
-        if (config.usePageTransitions) {
+        if (config.usePageTransitions && !config.eInkMode) {
             recycler.smoothScrollBy(0, scrollDistance)
         } else {
             recycler.scrollBy(0, scrollDistance)

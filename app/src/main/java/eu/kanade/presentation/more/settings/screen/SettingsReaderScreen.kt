@@ -230,9 +230,9 @@ object SettingsReaderScreen : SearchableSettings {
                     enabled = flashPageState,
                 ),
                 Preference.PreferenceItem.SwitchPreference(
-                    preference = readerPreferences.eInkSwipeSensitivity(),
-                    title = "E-Ink swipe",
-                    subtitle = "Disables page transition animations and lowers swipe thresholds for e-ink displays",
+                    preference = readerPreferences.eInkMode(),
+                    title = "E-Ink mode",
+                    subtitle = "Disables reader movement animations and lowers swipe thresholds for e-ink displays",
                 ),
             ),
         )

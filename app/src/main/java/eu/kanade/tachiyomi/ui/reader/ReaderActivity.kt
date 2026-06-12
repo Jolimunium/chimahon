@@ -1509,7 +1509,9 @@ class ReaderActivity : BaseActivity() {
                                     when (v) {
                                         is PagerViewer -> v.moveToNext()
                                         is WebtoonViewer -> {
-                                            if (readerPreferences.smoothAutoScroll().get()) {
+                                            val smoothAutoScroll = readerPreferences.smoothAutoScroll().get() &&
+                                                !readerPreferences.eInkMode().get()
+                                            if (smoothAutoScroll) {
                                                 v.linearScroll(interval)
                                             } else {
                                                 v.scrollDown()

@@ -45,6 +45,18 @@ open class Pager(
     }
     // SY <--
 
+    private var defaultScroller: Scroller? = null
+    private var defaultTouchSlop: Int? = null
+    private var defaultMinimumVelocity: Int? = null
+    private var defaultFlingDistance: Int? = null
+
+    var eInkMode = Injekt.get<ReaderPreferences>().eInkMode().get()
+        set(value) {
+            if (field == value) return
+            field = value
+            applyEInkMode()
+        }
+
     /**
      * Gesture listener that implements tap and long tap events.
      */
@@ -72,34 +84,60 @@ open class Pager(
     private val gestureDetector = GestureDetectorWithLongTap(context, gestureListener)
 
     init {
-        if (Injekt.get<ReaderPreferences>().eInkSwipeSensitivity().get()) {
-            reduceSwipeThresholds()
-            try {
-                DirectionalViewPager::class.java
-                    .getDeclaredField("mScroller").apply { isAccessible = true }
-                    .set(this, object : Scroller(context) {
+        applyEInkMode()
+    }
+
+    private fun applyEInkMode() {
+        updateSwipeThresholds(eInkMode)
+        updatePageScroller(eInkMode)
+    }
+
+    private fun updatePageScroller(instantScroll: Boolean) {
+        try {
+            val scroller = DirectionalViewPager::class.java
+                .getDeclaredField("mScroller")
+                .apply { isAccessible = true }
+            defaultScroller = defaultScroller ?: scroller.get(this) as? Scroller
+            scroller.set(
+                this,
+                if (instantScroll) {
+                    object : Scroller(context) {
                         override fun startScroll(startX: Int, startY: Int, dx: Int, dy: Int, duration: Int) {
                             super.startScroll(startX, startY, dx, dy, 0)
                         }
-                    })
-            } catch (_: Exception) {}
-        }
+                    }
+                } else {
+                    defaultScroller ?: Scroller(context)
+                },
+            )
+        } catch (_: Exception) {}
     }
 
-    private fun reduceSwipeThresholds() {
+    private fun updateSwipeThresholds(reduceThresholds: Boolean) {
         try {
             val density = resources.displayMetrics.density
             val ctx = context
             val clazz = DirectionalViewPager::class.java
             val touchSlop = clazz.getDeclaredField("mTouchSlop").apply { isAccessible = true }
-            touchSlop.setInt(this, ViewConfiguration.get(ctx).scaledTouchSlop / 2)
+            defaultTouchSlop = defaultTouchSlop ?: touchSlop.getInt(this)
             val minVel = clazz.getDeclaredField("mMinimumVelocity").apply { isAccessible = true }
-            minVel.setInt(this, (75 * density).toInt())
+            defaultMinimumVelocity = defaultMinimumVelocity ?: minVel.getInt(this)
             val flingDist = clazz.getDeclaredField("mFlingDistance").apply { isAccessible = true }
-            flingDist.setInt(this, (4 * density).toInt())
+            defaultFlingDistance = defaultFlingDistance ?: flingDist.getInt(this)
+
+            if (reduceThresholds) {
+                touchSlop.setInt(this, ViewConfiguration.get(ctx).scaledTouchSlop / 2)
+                minVel.setInt(this, (75 * density).toInt())
+                flingDist.setInt(this, (4 * density).toInt())
+            } else {
+                touchSlop.setInt(this, defaultTouchSlop ?: ViewConfiguration.get(ctx).scaledTouchSlop)
+                minVel.setInt(this, defaultMinimumVelocity ?: minVel.getInt(this))
+                flingDist.setInt(this, defaultFlingDistance ?: flingDist.getInt(this))
+            }
         } catch (_: Exception) {
         }
     }
+
     /**
      * Whether the gesture detector is currently enabled.
      */

@@ -220,7 +220,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
             sWidth > sHeight &&
             scale == minScale
         ) {
-            handler?.postDelayed(500) {
+            val zoom = zoom@{
                 val point = when (config.zoomStartPosition) {
                     ZoomStartPosition.LEFT -> if (forward) PointF(0F, 0F) else PointF(sWidth.toFloat(), 0F)
                     ZoomStartPosition.RIGHT -> if (forward) PointF(sWidth.toFloat(), 0F) else PointF(0F, 0F)
@@ -232,11 +232,20 @@ open class ReaderPageImageView @JvmOverloads constructor(
                     // KMK <--
                     else -> height.toFloat() / sHeight.toFloat()
                 }
-                (animateScaleAndCenter(targetScale, point) ?: return@postDelayed)
-                    .withDuration(500)
-                    .withEasing(EASE_IN_OUT_QUAD)
-                    .withInterruptible(true)
-                    .start()
+                if (config.eInkMode) {
+                    setScaleAndCenter(targetScale, point)
+                } else {
+                    (animateScaleAndCenter(targetScale, point) ?: return@zoom)
+                        .withDuration(500)
+                        .withEasing(EASE_IN_OUT_QUAD)
+                        .withInterruptible(true)
+                        .start()
+                }
+            }
+            if (config.eInkMode) {
+                zoom()
+            } else {
+                handler?.postDelayed(500) { zoom() }
             }
         }
     }
@@ -380,12 +389,17 @@ open class ReaderPageImageView @JvmOverloads constructor(
     private fun pan(fn: (PointF, SubsamplingScaleImageView) -> PointF) {
         (pageView as? SubsamplingScaleImageView)?.let { view ->
 
-            val target = fn(view.center ?: return, view)
-            view.animateCenter(target)!!
-                .withEasing(EASE_OUT_QUAD)
-                .withDuration(250)
-                .withInterruptible(true)
-                .start()
+            val center = view.center ?: return
+            val target = fn(PointF(center.x, center.y), view)
+            if (config?.eInkMode == true) {
+                view.setScaleAndCenter(view.scale, target)
+            } else {
+                view.animateCenter(target)!!
+                    .withEasing(EASE_OUT_QUAD)
+                    .withDuration(250)
+                    .withInterruptible(true)
+                    .start()
+            }
         }
     }
 
@@ -444,7 +458,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
         data: Any,
         config: Config,
     ) = (pageView as? SubsamplingScaleImageView)?.apply {
-        setDoubleTapZoomDuration(config.zoomDuration.getSystemScaledDuration())
+        setDoubleTapZoomDuration(if (config.eInkMode) 0 else config.zoomDuration.getSystemScaledDuration())
         setMinimumScaleType(config.minimumScaleType)
         setMinimumDpi(1) // Just so that very small image will be fit for initial load
         setCropBorders(config.cropBorders)
@@ -522,10 +536,11 @@ open class ReaderPageImageView @JvmOverloads constructor(
                 setOnDoubleTapListener(
                     object : GestureDetector.SimpleOnGestureListener() {
                         override fun onDoubleTap(e: MotionEvent): Boolean {
+                            val animate = this@ReaderPageImageView.config?.eInkMode != true
                             if (scale > 1F) {
-                                setScale(1F, e.x, e.y, true)
+                                setScale(1F, e.x, e.y, animate)
                             } else {
-                                setScale(2F, e.x, e.y, true)
+                                setScale(2F, e.x, e.y, animate)
                             }
                             return true
                         }
@@ -549,7 +564,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
         config: Config,
     ) = (pageView as? AppCompatImageView)?.apply {
         if (this is PhotoView) {
-            setZoomTransitionDuration(config.zoomDuration.getSystemScaledDuration())
+            setZoomTransitionDuration(if (config.eInkMode) 0 else config.zoomDuration.getSystemScaledDuration())
         }
 
         val request = ImageRequest.Builder(context)
@@ -912,6 +927,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
         val doubleTapZoom: Boolean = true,
         val landscapeZoomScaleType: LandscapeZoomScaleType = LandscapeZoomScaleType.FIT,
         // KMK <--
+        val eInkMode: Boolean = false,
     )
 
     enum class ZoomStartPosition {

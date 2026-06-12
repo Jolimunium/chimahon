@@ -262,6 +262,7 @@ class PagerPageHolder(
                         doubleTapZoom = viewer.config.doubleTapZoom,
                         landscapeZoomScaleType = viewer.config.landscapeZoomScaleType,
                         // KMK <--
+                        eInkMode = viewer.config.eInkMode,
                     ),
                 )
                 if (!isAnimated) {

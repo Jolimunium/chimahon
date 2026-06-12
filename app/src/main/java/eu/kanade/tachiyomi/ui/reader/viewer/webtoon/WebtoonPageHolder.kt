@@ -241,6 +241,7 @@ class WebtoonPageHolder(
                         cropBorders =
                         (viewer.config.imageCropBorders && viewer.isContinuous) ||
                             (viewer.config.continuousCropBorders && !viewer.isContinuous),
+                        eInkMode = viewer.config.eInkMode,
                     ),
                 )
                 removeErrorLayout()

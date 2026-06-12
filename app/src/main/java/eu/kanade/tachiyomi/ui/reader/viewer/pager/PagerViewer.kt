@@ -226,6 +226,11 @@ abstract class PagerViewer(
             val showOnStart = config.navigationOverlayOnStart || config.forceNavigationOverlay
             activity.binding.navigationOverlay.setNavigation(config.navigator, showOnStart)
         }
+
+        config.eInkModeChangedListener = {
+            pager.eInkMode = it
+        }
+        pager.eInkMode = config.eInkMode
     }
 
     override fun destroy() {
@@ -389,7 +394,7 @@ abstract class PagerViewer(
         val position = adapter.joinedItems.indexOfFirst { it.first == page || it.second == page }
         if (position != -1) {
             val currentPosition = pager.currentItem
-            pager.setCurrentItem(position, true)
+            pager.setCurrentItem(position, !config.eInkMode)
             // manually call onPageChange since ViewPager listener is not triggered in this case
             if (currentPosition == position) {
                 onPageChange(position)
@@ -430,7 +435,7 @@ abstract class PagerViewer(
             if (holder != null && config.navigateToPan && holder.canPanRight()) {
                 holder.panRight()
             } else {
-                pager.setCurrentItem(pager.currentItem + 1, config.usePageTransitions)
+                pager.setCurrentItem(pager.currentItem + 1, config.usePageTransitions && !config.eInkMode)
             }
         }
     }
@@ -444,7 +449,7 @@ abstract class PagerViewer(
             if (holder != null && config.navigateToPan && holder.canPanLeft()) {
                 holder.panLeft()
             } else {
-                pager.setCurrentItem(pager.currentItem - 1, config.usePageTransitions)
+                pager.setCurrentItem(pager.currentItem - 1, config.usePageTransitions && !config.eInkMode)
             }
         }
     }
