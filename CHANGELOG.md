@@ -4,6 +4,11 @@ All notable changes to Chimahon are documented here.
 
 The format follows a Keep a Changelog style and uses Semantic Versioning.
 
+## [v1.9.4.1]
+
+### Fixed
+- Android 16 screen lookup crash (VirtualDisplay/ImageReader lifecycle ordering)
+
 ## [v1.9.4]
 
 ### Added
