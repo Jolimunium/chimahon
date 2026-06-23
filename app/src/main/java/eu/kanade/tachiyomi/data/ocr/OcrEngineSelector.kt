@@ -2,10 +2,9 @@ package eu.kanade.tachiyomi.data.ocr
 
 import android.graphics.Bitmap
 import chimahon.ocr.LensClient
-import chimahon.ocr.MergeConfig
 import chimahon.ocr.OcrLanguage
 import chimahon.ocr.OcrResult
-import chimahon.ocr.OwOCRMerger
+import chimahon.ocr.processImageWithChunks
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import logcat.LogPriority
@@ -13,7 +12,6 @@ import logcat.logcat
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.ByteArrayOutputStream
-import kotlin.math.sqrt
 
 suspend fun recognizePage(
     bytes: ByteArray,
@@ -38,12 +36,19 @@ suspend fun recognizePage(
             logcat("OcrEngineSelector", LogPriority.WARN) { "local engine failed to initialize" }
             return emptyList()
         }
-        val lines = localOcrBridge.recognize(bytes, language)
-        if (lines.isEmpty()) {
+        val result = processImageWithChunks(bytes, language) { chunk ->
+            val chunkBytes = withContext(Dispatchers.Default) {
+                chunk.bitmap.toJpegBytes(85)
+            }
+            val lines = localOcrBridge.recognize(chunkBytes, language)
+            chunk.bitmap.recycle()
+            lines
+        }
+        if (result.isEmpty()) {
             logcat("OcrEngineSelector", LogPriority.WARN) { "local engine returned no results" }
             return emptyList()
         }
-        return OwOCRMerger.merge(lines, MergeConfig(language = language))
+        return result
     }
 
     val lensClient = Injekt.get<LensClient>()
@@ -74,15 +79,19 @@ suspend fun recognizePage(
             logcat("OcrEngineSelector", LogPriority.WARN) { "local engine failed to initialize" }
             return emptyList()
         }
-        val bytes = withContext(Dispatchers.Default) {
-            bitmap.optimizeForLocalOcr()
+        val result = processImageWithChunks(bitmap, language) { chunk ->
+            val chunkBytes = withContext(Dispatchers.Default) {
+                chunk.bitmap.toJpegBytes(85)
+            }
+            val lines = localOcrBridge.recognize(chunkBytes, language)
+            if (chunk.bitmap !== bitmap) chunk.bitmap.recycle()
+            lines
         }
-        val lines = localOcrBridge.recognize(bytes, language)
-        if (lines.isEmpty()) {
+        if (result.isEmpty()) {
             logcat("OcrEngineSelector", LogPriority.WARN) { "local engine returned no results" }
             return emptyList()
         }
-        return OwOCRMerger.merge(lines, MergeConfig(language = language))
+        return result
     }
 
     val lensClient = Injekt.get<LensClient>()
@@ -90,22 +99,9 @@ suspend fun recognizePage(
     return debugResult.mergedResults
 }
 
-private fun Bitmap.optimizeForLocalOcr(maxPixels: Int = 3_000_000): ByteArray {
-    val sourcePixels = width.toLong() * height.toLong()
-    val bitmapForOcr = if (sourcePixels > maxPixels) {
-        val scale = sqrt(maxPixels.toDouble() / sourcePixels.toDouble())
-        Bitmap.createScaledBitmap(
-            this,
-            (width * scale).toInt().coerceAtLeast(1),
-            (height * scale).toInt().coerceAtLeast(1),
-            true,
-        )
-    } else {
-        this
-    }
-    return ByteArrayOutputStream().use { output ->
-        bitmapForOcr.compress(Bitmap.CompressFormat.JPEG, 85, output)
-        if (bitmapForOcr !== this) bitmapForOcr.recycle()
-        output.toByteArray()
+private fun Bitmap.toJpegBytes(quality: Int): ByteArray {
+    return ByteArrayOutputStream().use { out ->
+        compress(Bitmap.CompressFormat.JPEG, quality, out)
+        out.toByteArray()
     }
 }
