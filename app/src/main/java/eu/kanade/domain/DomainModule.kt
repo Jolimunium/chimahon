@@ -1,8 +1,13 @@
 package eu.kanade.domain
 
+import eu.kanade.domain.entries.anime.interactor.SetAnimeViewerFlags
+import eu.kanade.domain.animeextension.interactor.GetAnimeExtensionLanguages
+import eu.kanade.domain.animeextension.interactor.GetAnimeExtensionSources
+import eu.kanade.domain.animeextension.interactor.GetAnimeExtensionsByType
 import eu.kanade.domain.chapter.interactor.GetAvailableScanlators
 import eu.kanade.domain.chapter.interactor.SetReadStatus
 import eu.kanade.domain.chapter.interactor.SyncChaptersWithSource
+import eu.kanade.domain.animedownload.interactor.DeleteAnimeDownload
 import eu.kanade.domain.download.interactor.DeleteDownload
 import eu.kanade.domain.extension.interactor.GetExtensionLanguages
 import eu.kanade.domain.extension.interactor.GetExtensionSources
@@ -13,6 +18,7 @@ import eu.kanade.domain.manga.interactor.SetExcludedScanlators
 import eu.kanade.domain.manga.interactor.SetMangaViewerFlags
 import eu.kanade.domain.manga.interactor.UpdateManga
 import eu.kanade.domain.source.interactor.GetEnabledSources
+import eu.kanade.domain.source.anime.interactor.GetAnimeIncognitoState
 import eu.kanade.domain.source.interactor.GetIncognitoState
 import eu.kanade.domain.source.interactor.GetLanguagesWithSources
 import eu.kanade.domain.source.interactor.GetSourcesWithFavoriteCount
@@ -25,7 +31,16 @@ import eu.kanade.domain.track.interactor.AddTracks
 import eu.kanade.domain.track.interactor.RefreshTracks
 import eu.kanade.domain.track.interactor.SyncChapterProgressWithTrack
 import eu.kanade.domain.track.interactor.TrackChapter
+import eu.kanade.tachiyomi.ui.player.utils.TrackSelect
+import mihon.data.repository.AnimeExtensionRepoRepositoryImpl
 import mihon.data.repository.ExtensionRepoRepositoryImpl
+import mihon.domain.animeextensionrepo.interactor.CreateAnimeExtensionRepo
+import mihon.domain.animeextensionrepo.interactor.DeleteAnimeExtensionRepo
+import mihon.domain.animeextensionrepo.interactor.GetAnimeExtensionRepo
+import mihon.domain.animeextensionrepo.interactor.GetAnimeExtensionRepoCount
+import mihon.domain.animeextensionrepo.interactor.ReplaceAnimeExtensionRepo
+import mihon.domain.animeextensionrepo.interactor.UpdateAnimeExtensionRepo
+import mihon.domain.animeextensionrepo.repository.AnimeExtensionRepoRepository
 import mihon.domain.chapter.interactor.FilterChaptersForDownload
 import mihon.domain.extensionrepo.interactor.CreateExtensionRepo
 import mihon.domain.extensionrepo.interactor.DeleteExtensionRepo
@@ -37,8 +52,11 @@ import mihon.domain.extensionrepo.repository.ExtensionRepoRepository
 import mihon.domain.extensionrepo.service.ExtensionRepoService
 import mihon.domain.migration.usecases.MigrateMangaUseCase
 import mihon.domain.upcoming.interactor.GetUpcomingManga
+import tachiyomi.data.source.anime.AnimeSourceRepositoryImpl
+import tachiyomi.data.source.anime.StubAnimeSourceRepositoryImpl
 import tachiyomi.data.category.CategoryRepositoryImpl
 import tachiyomi.data.chapter.ChapterRepositoryImpl
+import tachiyomi.data.history.AnimeHistoryRepositoryImpl
 import tachiyomi.data.history.HistoryRepositoryImpl
 import tachiyomi.data.manga.MangaRepositoryImpl
 import tachiyomi.data.release.ReleaseServiceImpl
@@ -46,6 +64,9 @@ import tachiyomi.data.source.SourceRepositoryImpl
 import tachiyomi.data.source.StubSourceRepositoryImpl
 import tachiyomi.data.track.TrackRepositoryImpl
 import tachiyomi.data.updates.UpdatesRepositoryImpl
+import tachiyomi.domain.source.anime.interactor.GetRemoteAnime
+import tachiyomi.domain.source.anime.repository.AnimeSourceRepository
+import tachiyomi.domain.source.anime.repository.StubAnimeSourceRepository
 import tachiyomi.domain.category.interactor.CreateCategoryWithName
 import tachiyomi.domain.category.interactor.DeleteCategory
 import tachiyomi.domain.category.interactor.GetCategories
@@ -65,12 +86,16 @@ import tachiyomi.domain.chapter.interactor.SetMangaDefaultChapterFlags
 import tachiyomi.domain.chapter.interactor.ShouldUpdateDbChapter
 import tachiyomi.domain.chapter.interactor.UpdateChapter
 import tachiyomi.domain.chapter.repository.ChapterRepository
+import tachiyomi.domain.history.interactor.GetAnimeHistory
 import tachiyomi.domain.history.interactor.GetAllHistory
 import tachiyomi.domain.history.interactor.GetHistory
 import tachiyomi.domain.history.interactor.GetNextChapters
 import tachiyomi.domain.history.interactor.GetTotalReadDuration
+import tachiyomi.domain.history.interactor.RemoveAnimeHistory
 import tachiyomi.domain.history.interactor.RemoveHistory
+import tachiyomi.domain.history.interactor.UpsertAnimeHistory
 import tachiyomi.domain.history.interactor.UpsertHistory
+import tachiyomi.domain.history.repository.AnimeHistoryRepository
 import tachiyomi.domain.history.repository.HistoryRepository
 import tachiyomi.domain.manga.interactor.FetchInterval
 import tachiyomi.domain.manga.interactor.GetDuplicateLibraryManga
@@ -90,6 +115,14 @@ import tachiyomi.domain.source.interactor.GetRemoteManga
 import tachiyomi.domain.source.interactor.GetSourcesWithNonLibraryManga
 import tachiyomi.domain.source.repository.SourceRepository
 import tachiyomi.domain.source.repository.StubSourceRepository
+import tachiyomi.data.custombutton.CustomButtonRepositoryImpl
+import tachiyomi.domain.custombuttons.interactor.CreateCustomButton
+import tachiyomi.domain.custombuttons.interactor.DeleteCustomButton
+import tachiyomi.domain.custombuttons.interactor.GetCustomButtons
+import tachiyomi.domain.custombuttons.interactor.ReorderCustomButton
+import tachiyomi.domain.custombuttons.interactor.ToggleFavoriteCustomButton
+import tachiyomi.domain.custombuttons.interactor.UpdateCustomButton
+import tachiyomi.domain.custombuttons.repository.CustomButtonRepository
 import tachiyomi.domain.track.interactor.DeleteTrack
 import tachiyomi.domain.track.interactor.GetTracks
 import tachiyomi.domain.track.interactor.GetTracksPerManga
@@ -177,7 +210,25 @@ class DomainModule : InjektModule {
         addFactory { RemoveHistory(get()) }
         addFactory { GetTotalReadDuration(get()) }
 
+        addSingletonFactory<AnimeHistoryRepository> { AnimeHistoryRepositoryImpl(get()) }
+        addFactory { GetAnimeHistory(get()) }
+        addFactory { UpsertAnimeHistory(get()) }
+        addFactory { RemoveAnimeHistory(get()) }
+
         addFactory { DeleteDownload(get(), get()) }
+        addFactory { DeleteAnimeDownload(get(), get()) }
+
+        addSingletonFactory<CustomButtonRepository> { CustomButtonRepositoryImpl(get()) }
+        addFactory { CreateCustomButton(get()) }
+        addFactory { DeleteCustomButton(get()) }
+        addFactory { GetCustomButtons(get()) }
+        addFactory { UpdateCustomButton(get()) }
+        addFactory { ReorderCustomButton(get()) }
+        addFactory { ToggleFavoriteCustomButton(get()) }
+
+        addFactory { SetAnimeViewerFlags(get()) }
+
+        addFactory { TrackSelect(get(), get()) }
 
         addFactory { GetExtensionsByType(get(), get()) }
         addFactory { GetExtensionSources(get()) }
@@ -207,7 +258,23 @@ class DomainModule : InjektModule {
         addFactory { DeleteExtensionRepo(get()) }
         addFactory { ReplaceExtensionRepo(get()) }
         addFactory { UpdateExtensionRepo(get(), get()) }
+
+        addSingletonFactory<AnimeExtensionRepoRepository> { AnimeExtensionRepoRepositoryImpl(get()) }
+        addSingletonFactory<StubAnimeSourceRepository> { StubAnimeSourceRepositoryImpl(get()) }
+        addSingletonFactory<AnimeSourceRepository> { AnimeSourceRepositoryImpl(get(), get()) }
+        addFactory { GetRemoteAnime(get()) }
+        addFactory { GetAnimeExtensionRepo(get()) }
+        addFactory { GetAnimeExtensionRepoCount(get()) }
+        addFactory { CreateAnimeExtensionRepo(get(), get()) }
+        addFactory { DeleteAnimeExtensionRepo(get()) }
+        addFactory { ReplaceAnimeExtensionRepo(get()) }
+        addFactory { UpdateAnimeExtensionRepo(get(), get()) }
+        addFactory { GetAnimeExtensionsByType(get(), get()) }
+        addFactory { GetAnimeExtensionLanguages(get(), get()) }
+        addFactory { GetAnimeExtensionSources(get()) }
+
         addFactory { ToggleIncognito(get()) }
         addFactory { GetIncognitoState(get(), get(), get()) }
+        addFactory { GetAnimeIncognitoState(get(), get(), get()) }
     }
 }

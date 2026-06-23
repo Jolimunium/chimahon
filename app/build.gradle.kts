@@ -141,6 +141,16 @@ android {
                 "libimagedecoder",
                 "libquickjs",
                 "libsqlite3x",
+                "libmpv",
+                "libavcodec",
+                "libavformat",
+                "libswscale",
+                "libavutil",
+                "libswresample",
+                "libavfilter",
+                "libass",
+                "libdav1d",
+                "libplacebo",
             )
                 .map { "**/$it.so" }
         }
@@ -211,6 +221,9 @@ dependencies {
     }
 
     implementation(projects.i18n)
+    // ANK -->
+    implementation(projects.i18nAnk)
+    // ANK <--
     // KMK -->
     implementation(projects.i18nKmk)
     // KMK <--
@@ -238,6 +251,7 @@ dependencies {
     debugImplementation(compose.ui.tooling)
     implementation(compose.ui.tooling.preview)
     implementation(compose.ui.util)
+    implementation(compose.constraintlayout)
 
     implementation(androidx.interpolator)
 
@@ -350,6 +364,18 @@ dependencies {
     implementation(libs.leakcanary.plumber)
 
     testImplementation(kotlinx.coroutines.test)
+
+    // MPV player
+    implementation(libs.aniyomi.mpv)
+    implementation(libs.seeker)
+    implementation(libs.ffmpeg.kit)
+    implementation(libs.smart.exception.java)
+    implementation(libs.mediasession)
+    implementation(libs.truetypeparser)
+    implementation(libs.torrentserver)
+    implementation(libs.nanohttpd)
+    implementation(libs.media.router)
+    implementation(libs.cast.play.services)
 
     // SY -->
     // Better logging (EH)

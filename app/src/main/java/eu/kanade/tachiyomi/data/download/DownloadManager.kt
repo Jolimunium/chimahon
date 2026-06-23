@@ -54,6 +54,7 @@ class DownloadManager(
      */
     private val downloader = Downloader(context, provider, cache)
     private val ocrManager: OcrManager by lazy { Injekt.get() }
+    private val animeDownloadManager: eu.kanade.tachiyomi.data.animedownload.AnimeDownloadManager by lazy { Injekt.get() }
 
     val isRunning: Boolean
         get() = downloader.isRunning
@@ -588,6 +589,54 @@ class DownloadManager(
                 queueState.value.filter { download -> download.status == Download.State.DOWNLOADING }.asFlow(),
             )
         }
+
+    // Anime download methods delegated to AnimeDownloadManager
+    fun isEpisodeDownloaded(
+        episodeName: String,
+        episodeScanlator: String?,
+        animeTitle: String,
+        sourceId: Long,
+        skipCache: Boolean = false,
+    ): Boolean {
+        return if (skipCache) {
+            val cache: eu.kanade.tachiyomi.data.animedownload.AnimeDownloadCache = Injekt.get()
+            cache.isEpisodeDownloaded(episodeName, episodeScanlator, animeTitle, sourceId, true)
+        } else {
+            animeDownloadManager.isEpisodeDownloaded(episodeName, episodeScanlator, animeTitle, sourceId)
+        }
+    }
+
+    fun downloadEpisodes(
+        anime: tachiyomi.domain.entries.anime.model.Anime,
+        episodes: List<tachiyomi.domain.episode.model.Episode>,
+    ) {
+        animeDownloadManager.downloadEpisodes(anime, episodes, autoStart = false)
+    }
+
+    fun enqueueEpisodesToDelete(
+        episodes: List<tachiyomi.domain.episode.model.Episode>,
+        anime: tachiyomi.domain.entries.anime.model.Anime,
+    ) {
+        tachiyomi.core.common.util.lang.launchIO {
+            animeDownloadManager.enqueueEpisodesToDelete(episodes, anime)
+        }
+    }
+
+    fun deletePendingEpisodes() {
+        animeDownloadManager.deletePendingEpisodes()
+    }
+
+    fun buildVideo(
+        source: eu.kanade.tachiyomi.source.Source,
+        anime: tachiyomi.domain.entries.anime.model.Anime,
+        episode: tachiyomi.domain.episode.model.Episode,
+    ): eu.kanade.tachiyomi.animesource.model.Video? {
+        return try {
+            animeDownloadManager.buildVideo(source as eu.kanade.tachiyomi.animesource.AnimeSource, anime, episode)
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     fun progressFlow(): Flow<Download> = queueState
         .flatMapLatest { downloads ->

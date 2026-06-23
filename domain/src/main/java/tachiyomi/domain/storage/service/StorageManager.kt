@@ -52,6 +52,7 @@ class StorageManager(
                 baseDir?.let { parent ->
                     parent.createDirectory(AUTOMATIC_BACKUPS_PATH)
                     parent.createDirectory(LOCAL_SOURCE_PATH)
+                    parent.createDirectory(LOCAL_ANIMESOURCE_PATH)
                     parent.createDirectory(DOWNLOADS_PATH).also {
                         DiskUtil.createNoMediaFile(it, context)
                     }
@@ -80,6 +81,30 @@ class StorageManager(
 
     fun getLocalSourceDirectory(): UniFile? {
         return baseDir?.createDirectory(LOCAL_SOURCE_PATH)
+    }
+
+    fun getAnimeDownloadsDirectory(): UniFile? {
+        return baseDir?.createDirectory(ANIME_DOWNLOADS_PATH)
+    }
+
+    fun getLocalAnimeSourceDirectory(): UniFile? {
+        return baseDir?.createDirectory(LOCAL_ANIMESOURCE_PATH)
+    }
+
+    fun getMPVConfigDirectory(): UniFile? {
+        return baseDir?.createDirectory(MPV_CONFIG_PATH)
+    }
+
+    fun getScriptsDirectory(): UniFile? {
+        return baseDir?.createDirectory("$MPV_CONFIG_PATH/$SCRIPTS_PATH")
+    }
+
+    fun getScriptOptsDirectory(): UniFile? {
+        return baseDir?.createDirectory("$MPV_CONFIG_PATH/$SCRIPT_OPTS_PATH")
+    }
+
+    fun getFontsDirectory(): UniFile? {
+        return baseDir?.createDirectory("$MPV_CONFIG_PATH/fonts")
     }
 
     // SY -->
@@ -221,8 +246,14 @@ class StorageManager(
 
 private const val AUTOMATIC_BACKUPS_PATH = "autobackup"
 private const val DOWNLOADS_PATH = "downloads"
+private const val ANIME_DOWNLOADS_PATH = "downloads"
 private const val LOCAL_SOURCE_PATH = "local"
+private const val LOCAL_ANIMESOURCE_PATH = "localanime"
 
 // SY -->
 private const val LOGS_PATH = "logs"
 // SY <--
+
+const val SCRIPTS_PATH = "scripts"
+const val SCRIPT_OPTS_PATH = "script-opts"
+private const val MPV_CONFIG_PATH = "mpv"
