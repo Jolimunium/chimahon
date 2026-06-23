@@ -187,7 +187,7 @@ private val markerSections = listOf(
         ),
     ),
     MarkerSection("Frequency", listOf(Marker.FREQUENCIES, Marker.FREQUENCY_LOWEST, Marker.FREQUENCY_HARMONIC_RANK, Marker.FREQUENCY_AVERAGE_RANK)),
-    MarkerSection("Media", listOf(Marker.WORD_AUDIO, Marker.AUDIO, Marker.SCREENSHOT)),
+    MarkerSection("Media", listOf(Marker.WORD_AUDIO, Marker.AUDIO, Marker.SCREENSHOT, Marker.SENTENCE_AUDIO)),
     MarkerSection(
         "Context",
         listOf(
@@ -202,7 +202,6 @@ private val markerSections = listOf(
             Marker.CHAPTER,
             Marker.MEDIA,
             Marker.DOCUMENT_TITLE,
-            Marker.SENTENCE_AUDIO,
         ),
     ),
 )
@@ -216,6 +215,7 @@ private val markerDisplayLabels: Map<String, String> = Marker.ALL_WITH_TODO.asso
         Marker.FURIGANA -> "${prefix}Furigana"
         Marker.FURIGANA_PLAIN -> "${prefix}Furigana Plain"
         Marker.AUDIO -> "${prefix}Audio"
+        Marker.SENTENCE_AUDIO -> "${prefix}Sentence Audio"
         Marker.GLOSSARY -> "${prefix}Glossary"
         Marker.GLOSSARY_BRIEF -> "${prefix}Glossary Brief"
         Marker.GLOSSARY_PLAIN -> "${prefix}Glossary Plain"
