@@ -75,6 +75,7 @@ import kotlin.math.roundToInt
 fun SubtitleDelayPanel(
     animeId: Long?,
     onPrimaryDelayChange: (Int) -> Unit,
+    onSpeedChange: (Double) -> Unit,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -94,7 +95,10 @@ fun SubtitleDelayPanel(
         }
         var speed by remember { mutableFloatStateOf(MPVLib.getPropertyDouble("sub-speed").toFloat()) }
         LaunchedEffect(speed) {
-            if (speed in 0.1f..10f) MPVLib.setPropertyDouble("sub-speed", speed.toDouble())
+            if (speed in 0.1f..10f) {
+                MPVLib.setPropertyDouble("sub-speed", speed.toDouble())
+                onSpeedChange(speed.toDouble())
+            }
         }
         LaunchedEffect(delay, secondaryDelay, affectedSubtitle) {
             val finalDelay = (if (affectedSubtitle == SubtitleDelayType.Secondary) secondaryDelay else delay) / 1000.0

@@ -251,6 +251,7 @@ class PlayerViewModel @JvmOverloads constructor(
     private val _primarySubtitleDelaySeconds = MutableStateFlow(0.0)
     val primarySubtitleDelaySeconds = _primarySubtitleDelaySeconds.asStateFlow()
     private val _subtitleSpeedSeconds = MutableStateFlow(1.0)
+    val subtitleSpeedSeconds = _subtitleSpeedSeconds.asStateFlow()
     private var lastSubtitleHistoryText = ""
     private var nextSubtitleCueIndex = 0
     private val parsedSubtitleCuesByTrackId = mutableMapOf<Int, List<SubtitleCue>>()
