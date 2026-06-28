@@ -16,6 +16,9 @@
     <string name="label_novel_categories">Novel categories</string>
     <string name="manga">Library entries</string>
     <string name="manga_singular">Manga</string>
+    <string name="anime_library">Anime library</string>
+    <string name="label_anime_library">Anime library</string>
+    <string name="anime_singular">Anime</string>
     <string name="novel_singular">Novel</string>
     <string name="chapters">Chapters</string>
     <string name="track">Tracking</string>
@@ -88,12 +91,18 @@
     <string name="action_sort_alpha">Alphabetically</string>
     <string name="action_sort_count">Total entries</string>
     <string name="action_sort_total">Total chapters</string>
+    <string name="action_sort_total_episodes">Total episodes</string>
     <string name="action_sort_last_read">Last read</string>
+    <string name="action_sort_last_seen">Last seen</string>
     <string name="action_sort_last_manga_update">Last update check</string>
+    <string name="action_sort_last_anime_update">Last update check</string>
     <string name="action_sort_unread_count">Unread count</string>
+    <string name="action_sort_unseen_count">Unseen count</string>
     <string name="action_sort_next_updated">Next expected update</string>
     <string name="action_sort_latest_chapter">Latest chapter</string>
+    <string name="action_sort_latest_episode">Latest episode</string>
     <string name="action_sort_chapter_fetch_date">Chapter fetch date</string>
+    <string name="action_sort_episode_fetch_date">Episode fetch date</string>
     <string name="action_sort_date_added">Date added</string>
     <string name="action_sort_tracker_score">Tracker score</string>
     <string name="action_sort_random">Random</string>
@@ -129,6 +138,7 @@
     <string name="delete_category_confirmation">Do you wish to delete the category \"%s\"?</string>
     <string name="delete_category">Delete category</string>
     <string name="action_edit_cover">Edit cover</string>
+    <string name="action_edit_background">Edit background</string>
     <string name="action_view_chapters">View chapters</string>
     <string name="action_pause">Pause</string>
     <string name="action_previous_chapter">Previous chapter</string>
@@ -153,7 +163,9 @@
     <string name="action_display_list">List</string>
     <string name="action_display_cover_only_grid">Cover-only grid</string>
     <string name="action_display_download_badge">Downloaded chapters</string>
+    <string name="action_display_download_badge_anime">Downloaded episodes</string>
     <string name="action_display_unread_badge">Unread chapters</string>
+    <string name="action_display_unseen_badge">Unseen episodes</string>
     <string name="action_display_local_badge">Local source</string>
     <string name="action_display_language_badge">Language</string>
     <string name="action_display_show_tabs">Show category tabs</string>
@@ -926,7 +938,9 @@
     <!-- Library -->
     <string name="updating_category">Updating category</string>
     <string name="manga_from_library">From library</string>
+    <string name="anime_from_library">From library</string>
     <string name="downloaded_chapters">Downloaded chapters</string>
+    <string name="downloaded_episodes">Downloaded episodes</string>
     <string name="intervals_header">Intervals</string>
     <!-- For badges/buttons on library covers. -->
     <string name="overlay_header">Overlay</string>
@@ -1010,6 +1024,9 @@
     <string name="cover_saved">Cover saved</string>
     <string name="error_saving_cover">Error saving cover</string>
     <string name="error_sharing_cover">Error sharing cover</string>
+    <string name="background_saved">Background saved</string>
+    <string name="error_saving_background">Error saving background</string>
+    <string name="error_sharing_background">Error sharing background</string>
     <string name="confirm_delete_chapters">Are you sure you want to delete the selected chapters?</string>
     <string name="chapter_settings">Chapter settings</string>
     <string name="confirm_set_chapter_settings">Are you sure you want to save these settings as default?</string>
@@ -1171,6 +1188,8 @@
     <string name="notification_update_error">%1$d update(s) failed</string>
     <string name="learn_more">Tap to learn more</string>
     <string name="notification_cover_update_failed">Failed to update cover</string>
+    <string name="background_updated">Background updated</string>
+    <string name="notification_background_update_failed">Failed to update background</string>
     <string name="notification_first_add_to_library">Please add the entry to your library before doing this</string>
     <string name="library_errors_help">For help on how to fix library update errors, see %1$s</string>
     <string name="skipped_reason_completed">Skipped because series is complete</string>
@@ -1681,6 +1700,7 @@
     <string name="download_unseen">Unseen episodes</string>
     <string name="episode_progress">%1$s / %2$s</string>
     <string name="episode_settings">Episode settings</string>
+    <string name="filler">Filler</string>
     <string name="show_episode_number">Show episode number</string>
     <string name="sort_by_episode_number">Episode number</string>
     <string name="unseen">Unseen</string>

@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.entries.anime.library
 
+import tachiyomi.domain.source.anime.model.AnimeSource
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import tachiyomi.domain.library.model.LibraryAnime
 import uy.kohesive.injekt.Injekt
@@ -11,6 +12,7 @@ data class AnimeLibraryItem(
     var unseenCount: Long = -1,
     var isLocal: Boolean = false,
     var sourceLanguage: String = "",
+    var source: AnimeSource? = null,
     private val sourceManager: AnimeSourceManager = Injekt.get(),
 ) {
     fun matches(constraint: String): Boolean {

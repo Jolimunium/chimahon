@@ -1,5 +1,6 @@
 package eu.kanade.presentation.entries.anime.components
 
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,11 +42,11 @@ private fun AnimeDownloadDropdownMenuItems(
     onDownloadClicked: (DownloadAction) -> Unit,
 ) {
     val options = persistentListOf(
-        DownloadAction.NEXT_1_EPISODE to pluralStringResource(MR.plurals.download_amount_episodes, 1, 1),
-        DownloadAction.NEXT_5_EPISODES to pluralStringResource(MR.plurals.download_amount_episodes, 5, 5),
-        DownloadAction.NEXT_10_EPISODES to pluralStringResource(MR.plurals.download_amount_episodes, 10, 10),
-        DownloadAction.NEXT_25_EPISODES to pluralStringResource(MR.plurals.download_amount_episodes, 25, 25),
-        DownloadAction.UNSEEN_EPISODES to stringResource(MR.strings.download_unseen),
+        DownloadAction.NEXT_1_ITEM to pluralStringResource(MR.plurals.download_amount_episodes, 1, 1),
+        DownloadAction.NEXT_5_ITEMS to pluralStringResource(MR.plurals.download_amount_episodes, 5, 5),
+        DownloadAction.NEXT_10_ITEMS to pluralStringResource(MR.plurals.download_amount_episodes, 10, 10),
+        DownloadAction.NEXT_25_ITEMS to pluralStringResource(MR.plurals.download_amount_episodes, 25, 25),
+        DownloadAction.UNVIEWED_ITEMS to stringResource(MR.strings.download_unseen),
     )
 
     options.forEach { (downloadAction, label) ->

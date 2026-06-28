@@ -17,15 +17,10 @@ import eu.kanade.domain.entries.anime.model.downloadedFilter
 import eu.kanade.domain.entries.anime.model.episodesFiltered
 import eu.kanade.domain.entries.anime.model.seasonBookmarkedFilter
 import eu.kanade.domain.entries.anime.model.seasonCompletedFilter
-import eu.kanade.domain.entries.anime.model.seasonContinueOverlay
 import eu.kanade.domain.entries.anime.model.seasonDownloadedFilter
 import eu.kanade.domain.entries.anime.model.seasonFillermarkedFilter
 import eu.kanade.domain.entries.anime.model.seasonStartedFilter
 import eu.kanade.domain.entries.anime.model.seasonUnseenFilter
-import eu.kanade.domain.entries.anime.model.seasonDownloadedOverlay
-import eu.kanade.domain.entries.anime.model.seasonLangOverlay
-import eu.kanade.domain.entries.anime.model.seasonLocalOverlay
-import eu.kanade.domain.entries.anime.model.seasonUnseenOverlay
 import eu.kanade.domain.entries.anime.model.seasonsFiltered
 import eu.kanade.domain.entries.anime.model.toDomainAnime
 import eu.kanade.domain.entries.anime.model.toSAnime
@@ -38,6 +33,7 @@ import eu.kanade.domain.track.service.TrackPreferences
 import eu.kanade.presentation.entries.DownloadAction
 import eu.kanade.presentation.entries.anime.components.EpisodeDownloadAction
 import eu.kanade.presentation.util.formattedMessage
+import eu.kanade.tachiyomi.animesource.model.FetchType
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.data.animedownload.AnimeDownloadCache
@@ -105,6 +101,7 @@ import tachiyomi.domain.category.model.AnimeCategory
 import tachiyomi.domain.category.model.Category
 import tachiyomi.domain.download.service.DownloadPreferences
 import tachiyomi.domain.episode.interactor.SetAnimeDefaultEpisodeFlags
+import tachiyomi.domain.season.interactor.SetAnimeDefaultSeasonFlags
 import tachiyomi.domain.episode.interactor.UpdateEpisode
 import tachiyomi.domain.episode.model.Episode
 import tachiyomi.domain.episode.model.EpisodeUpdate
@@ -116,6 +113,7 @@ import tachiyomi.domain.source.anime.model.StubAnimeSource
 import tachiyomi.domain.storage.service.StoragePreferences
 import tachiyomi.domain.track.anime.repository.AnimeTrackRepository
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.ank.AMR
 import tachiyomi.source.local.entries.anime.isLocal
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -144,6 +142,7 @@ class AnimeScreenModel(
     private val getDuplicateLibraryAnime: GetDuplicateLibraryAnime = Injekt.get(),
     private val setAnimeEpisodeFlags: SetAnimeEpisodeFlags = Injekt.get(),
     private val setAnimeDefaultEpisodeFlags: SetAnimeDefaultEpisodeFlags = Injekt.get(),
+    private val setAnimeDefaultSeasonFlags: SetAnimeDefaultSeasonFlags = Injekt.get(),
     private val setSeenStatus: SetSeenStatus = Injekt.get(),
     private val updateEpisode: UpdateEpisode = Injekt.get(),
     private val updateAnime: UpdateAnime = Injekt.get(),
@@ -831,11 +830,15 @@ class AnimeScreenModel(
      */
     fun getNextUnseenEpisode(): Episode? {
         val successState = successState ?: return null
-        return successState.episodes.firstOrNull { !it.episode.seen }?.episode
+        return if (successState.anime.sortDescending()) {
+            successState.processedEpisodes.findLast { !it.episode.seen }
+        } else {
+            successState.processedEpisodes.find { !it.episode.seen }
+        }?.episode
     }
 
-    suspend fun getNextUnseenEpisode(season: SeasonAnime): Episode? {
-        val episodes = getAnimeAndEpisodes.awaitChapters(season.anime.id)
+    suspend fun getNextUnseenEpisode(anime: Anime): Episode? {
+        val episodes = getAnimeAndEpisodes.awaitChapters(anime.id)
         return episodes.firstOrNull { !it.seen }
     }
 
@@ -914,12 +917,12 @@ class AnimeScreenModel(
 
     fun runDownloadAction(action: DownloadAction) {
         val episodesToDownload = when (action) {
-            DownloadAction.NEXT_1_EPISODE -> getUnseenEpisodesSorted().take(1)
-            DownloadAction.NEXT_5_EPISODES -> getUnseenEpisodesSorted().take(5)
-            DownloadAction.NEXT_10_EPISODES -> getUnseenEpisodesSorted().take(10)
-            DownloadAction.NEXT_25_EPISODES -> getUnseenEpisodesSorted().take(25)
+            DownloadAction.NEXT_1_ITEM -> getUnseenEpisodesSorted().take(1)
+            DownloadAction.NEXT_5_ITEMS -> getUnseenEpisodesSorted().take(5)
+            DownloadAction.NEXT_10_ITEMS -> getUnseenEpisodesSorted().take(10)
+            DownloadAction.NEXT_25_ITEMS -> getUnseenEpisodesSorted().take(25)
 
-            DownloadAction.UNSEEN_EPISODES -> getUnseenEpisodes()
+            DownloadAction.UNVIEWED_ITEMS -> getUnseenEpisodes()
         }
         if (episodesToDownload.isNotEmpty()) {
             startDownload(episodesToDownload, false)
@@ -1331,24 +1334,16 @@ class AnimeScreenModel(
             val anime: Anime,
             val initialSelection: ImmutableList<CheckboxState<Category>>,
         ) : Dialog
-        data class ConfirmDelete(val episodes: List<Episode>) : Dialog
         data class DeleteEpisodes(val episodes: List<Episode>) : Dialog
-        data class DownloadLoading(val episode: Episode) : Dialog
         data class DuplicateAnime(val anime: Anime, val duplicates: List<Anime>) : Dialog
         data class Migrate(val newAnime: Anime, val oldAnime: Anime) : Dialog
-        data class QualitySelection(val episode: Episode, val videos: List<Video>) : Dialog
         data class SetAnimeFetchInterval(val anime: Anime) : Dialog
         data class ShowQualities(val episode: Episode, val anime: Anime, val source: AnimeSource) : Dialog
-
-        // SY -->
-        data class EditAnimeInfo(val anime: Anime) : Dialog
-        // SY <--
-
         data object ChangeAnimeSkipIntro : Dialog
-        data object SettingsSheet : Dialog
-        data object SeasonSettings : Dialog
+        data object EpisodeSettingsSheet : Dialog
+        data object SeasonSettingsSheet : Dialog
         data object TrackSheet : Dialog
-        data object FullCover : Dialog
+        data object FullImages : Dialog
     }
 
     fun dismissDialog() {
@@ -1409,33 +1404,25 @@ class AnimeScreenModel(
     }
 
     fun showSettingsDialog() {
-        updateSuccessState { it.copy(dialog = Dialog.SettingsSheet) }
+        updateSuccessState {
+            when (it.anime.fetchType) {
+                FetchType.Seasons -> it.copy(dialog = Dialog.SeasonSettingsSheet)
+                FetchType.Episodes -> it.copy(dialog = Dialog.EpisodeSettingsSheet)
+            }
+        }
     }
 
     fun showSeasonSettingsDialog() {
-        updateSuccessState { it.copy(dialog = Dialog.SeasonSettings) }
+        updateSuccessState { it.copy(dialog = Dialog.SeasonSettingsSheet) }
     }
 
     fun showTrackDialog() {
         updateSuccessState { it.copy(dialog = Dialog.TrackSheet) }
     }
 
-    fun showCoverDialog() {
-        updateSuccessState { it.copy(dialog = Dialog.FullCover) }
+    fun showImagesDialog() {
+        updateSuccessState { it.copy(dialog = Dialog.FullImages) }
     }
-
-    // SY -->
-    fun showEditAnimeInfoDialog() {
-        mutableState.update { state ->
-            when (state) {
-                State.Loading -> state
-                is State.Success -> {
-                    state.copy(dialog = Dialog.EditAnimeInfo(state.anime))
-                }
-            }
-        }
-    }
-    // SY <--
 
     fun showMigrateDialog(duplicate: Anime) {
         val anime = successState?.anime ?: return
@@ -1588,30 +1575,12 @@ class AnimeScreenModel(
     fun setSeasonSettingsAsDefault(applyToExisting: Boolean) {
         val anime = successState?.anime ?: return
         screenModelScope.launchNonCancellable {
-            libraryPreferences.setEpisodeSettingsDefault(anime)
+            libraryPreferences.setSeasonSettingsDefault(anime)
             if (applyToExisting) {
-                setAnimeSeasonFlags.awaitSetAllFlags(
-                    animeId = anime.id,
-                    downloadFilter = anime.seasonFlags and Anime.SEASON_DOWNLOADED_MASK,
-                    unseenFilter = anime.seasonFlags and Anime.SEASON_UNSEEN_MASK,
-                    startedFilter = anime.seasonFlags and Anime.SEASON_STARTED_MASK,
-                    completedFilter = anime.seasonFlags and Anime.SEASON_COMPLETED_MASK,
-                    bookmarkedFilter = anime.seasonFlags and Anime.SEASON_BOOKMARKED_MASK,
-                    fillermarkedFilter = anime.seasonFlags and Anime.SEASON_FILLERMARKED_MASK,
-                    sortingMode = anime.seasonFlags and Anime.SEASON_SORT_MASK,
-                    sortingDirection = anime.seasonFlags and Anime.SEASON_SORT_DIR_MASK,
-                    displayGridMode = SeasonDisplayMode.fromLong(anime.seasonDisplayGridMode),
-                    displayGridSize = anime.seasonDisplayGridSize,
-                    downloadedOverlay = anime.seasonDownloadedOverlay,
-                    unseenOverlay = anime.seasonUnseenOverlay,
-                    localOverlay = anime.seasonLocalOverlay,
-                    langOverlay = anime.seasonLangOverlay,
-                    continueOverlay = anime.seasonContinueOverlay,
-                    displayMode = anime.seasonFlags and Anime.SEASON_DISPLAY_MODE_MASK,
-                )
+                setAnimeDefaultSeasonFlags.await(anime)
             }
             snackbarHostState.showSnackbar(
-                message = context.stringResource(MR.strings.episode_settings_updated),
+                message = context.stringResource(AMR.strings.season_settings_updated),
             )
         }
     }
@@ -1701,6 +1670,12 @@ class AnimeScreenModel(
 
             val nextUnseenEpisode: Episode?
                 get() = processedEpisodes.firstOrNull { !it.episode.seen }?.episode
+
+            val showSummaries: Boolean
+                get() = true
+
+            val showPreviews: Boolean
+                get() = true
 
             val relatedAnimeSorted: List<RelatedAnime>?
                 get() = relatedAnimeCollection

@@ -46,7 +46,7 @@ import eu.kanade.domain.ui.model.setAppCompatDelegateThemeMode
 import eu.kanade.tachiyomi.core.security.PrivacyPreferences
 import eu.kanade.tachiyomi.crash.CrashActivity
 import eu.kanade.tachiyomi.crash.GlobalExceptionHandler
-import eu.kanade.tachiyomi.data.coil.AnimeCoverFetcher
+import eu.kanade.tachiyomi.data.coil.AnimeImageFetcher
 import eu.kanade.tachiyomi.data.coil.AnimeCoverKeyer
 import eu.kanade.tachiyomi.data.coil.AnimeKeyer
 import eu.kanade.tachiyomi.data.coil.BufferedSourceFetcher
@@ -277,8 +277,8 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
                 add(BufferedSourceFetcher.Factory())
                 add(MangaCoverFetcher.MangaCoverFactory(callFactoryLazy))
                 add(MangaCoverFetcher.MangaFactory(callFactoryLazy))
-                add(AnimeCoverFetcher.AnimeCoverFactory(callFactoryLazy))
-                add(AnimeCoverFetcher.AnimeFactory(callFactoryLazy))
+                add(AnimeImageFetcher.AnimeCoverFactory(callFactoryLazy))
+                add(AnimeImageFetcher.AnimeFactory(callFactoryLazy))
                 // Keyer
                 add(MangaCoverKeyer())
                 add(AnimeCoverKeyer())

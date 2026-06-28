@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,10 +15,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
+import eu.kanade.core.preference.PreferenceMutableState
+import eu.kanade.presentation.library.components.LibraryTabs
 import eu.kanade.tachiyomi.ui.entries.anime.library.AnimeLibraryItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tachiyomi.domain.category.model.AnimeCategory
+import tachiyomi.domain.category.model.Category
 import tachiyomi.domain.library.model.LibraryAnime
 import tachiyomi.domain.library.model.LibraryDisplayMode
 import tachiyomi.presentation.core.components.material.PullRefresh
@@ -28,19 +30,23 @@ import kotlin.time.Duration.Companion.seconds
 @Composable
 fun AnimeLibraryContent(
     categories: List<AnimeCategory>,
-    currentPage: Int,
+    searchQuery: String?,
+    selection: List<LibraryAnime>,
     contentPadding: PaddingValues,
-    selection: Set<Long>,
+    currentPage: () -> Int,
     hasActiveFilters: Boolean,
     showPageTabs: Boolean,
-    showAnimeCount: Boolean,
-    displayMode: LibraryDisplayMode,
     onChangeCurrentPage: (Int) -> Unit,
     onAnimeClicked: (Long) -> Unit,
     onContinueWatchingClicked: ((LibraryAnime) -> Unit)?,
     onToggleSelection: (LibraryAnime) -> Unit,
-    onRefresh: () -> Boolean,
-    getItemsForCategory: (AnimeCategory) -> List<AnimeLibraryItem>,
+    onToggleRangeSelection: (LibraryAnime) -> Unit,
+    onRefresh: (AnimeCategory?) -> Boolean,
+    onGlobalSearchClicked: () -> Unit,
+    getNumberOfAnimeForCategory: (AnimeCategory) -> Int?,
+    getDisplayMode: (Int) -> PreferenceMutableState<LibraryDisplayMode>,
+    getColumnsForOrientation: (Boolean) -> PreferenceMutableState<Int>,
+    getAnimeLibraryForPage: (Int) -> List<AnimeLibraryItem>,
 ) {
     Column(
         modifier = Modifier.padding(
@@ -49,58 +55,72 @@ fun AnimeLibraryContent(
             end = contentPadding.calculateEndPadding(LocalLayoutDirection.current),
         ),
     ) {
-        val pagerState = rememberPagerState(currentPage) { categories.size }
+        val coercedCurrentPage = remember { currentPage().coerceAtMost(categories.lastIndex) }
+        val pagerState = rememberPagerState(coercedCurrentPage) { categories.size }
 
         val scope = rememberCoroutineScope()
         var isRefreshing by remember(pagerState.currentPage) { mutableStateOf(false) }
 
         if (showPageTabs && categories.size > 1) {
-            AnimeLibraryTabs(
-                categories = categories,
+            LaunchedEffect(categories) {
+                if (categories.size <= pagerState.currentPage) {
+                    pagerState.scrollToPage(categories.size - 1)
+                }
+            }
+            val categoryItems = categories.map { animeCategory ->
+                Category(animeCategory.id, animeCategory.name, animeCategory.order, animeCategory.flags, animeCategory.hidden)
+            }
+            LibraryTabs(
+                categories = categoryItems,
                 pagerState = pagerState,
-                showAnimeCount = showAnimeCount,
-                getItemCount = { category -> getItemsForCategory(category).size },
-            )
+                getItemCountForCategory = { cat ->
+                    val matching = categories.firstOrNull { it.id == cat.id }
+                    if (matching != null) getNumberOfAnimeForCategory(matching) else null
+                },
+            ) { scope.launch { pagerState.animateScrollToPage(it) } }
         }
 
-        LaunchedEffect(pagerState.currentPage) {
-            onChangeCurrentPage(pagerState.currentPage)
+        val notSelectionMode = selection.isEmpty()
+        val onClickAnime = { anime: LibraryAnime ->
+            if (notSelectionMode) {
+                onAnimeClicked(anime.anime.id)
+            } else {
+                onToggleSelection(anime)
+            }
         }
 
         PullRefresh(
             refreshing = isRefreshing,
             onRefresh = {
-                val shouldRefresh = onRefresh()
-                if (shouldRefresh) {
+                val started = categories.getOrNull(currentPage())?.let(onRefresh) ?: false
+                if (!started) return@PullRefresh
+                scope.launch {
+                    // Fake refresh status but hide it after a second as it's a long running task
                     isRefreshing = true
-                    scope.launch {
-                        delay(1.5.seconds)
-                        isRefreshing = false
-                    }
+                    delay(1.seconds)
+                    isRefreshing = false
                 }
             },
-            enabled = selection.isEmpty(),
+            enabled = notSelectionMode,
         ) {
-            HorizontalPager(
+            AnimeLibraryPager(
                 state = pagerState,
-                beyondViewportPageCount = 1,
-            ) { page ->
-                val category = categories.getOrNull(page) ?: return@HorizontalPager
-                val items = getItemsForCategory(category)
+                contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
+                hasActiveFilters = hasActiveFilters,
+                selectedAnime = selection,
+                searchQuery = searchQuery,
+                onGlobalSearchClicked = onGlobalSearchClicked,
+                getDisplayMode = getDisplayMode,
+                getColumnsForOrientation = getColumnsForOrientation,
+                getLibraryForPage = getAnimeLibraryForPage,
+                onClickAnime = onClickAnime,
+                onLongClickAnime = onToggleRangeSelection,
+                onClickContinueWatching = onContinueWatchingClicked,
+            )
+        }
 
-                AnimeLibraryGrid(
-                    items = items,
-                    displayMode = displayMode,
-                    selection = selection,
-                    contentPadding = PaddingValues(
-                        bottom = contentPadding.calculateBottomPadding(),
-                    ),
-                    onAnimeClicked = onAnimeClicked,
-                    onContinueWatchingClicked = onContinueWatchingClicked,
-                    onToggleSelection = onToggleSelection,
-                    hasActiveFilters = hasActiveFilters,
-                )
-            }
+        LaunchedEffect(pagerState.currentPage) {
+            onChangeCurrentPage(pagerState.currentPage)
         }
     }
 }

@@ -13,6 +13,9 @@ import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.anime.model.AnimeCover
 import tachiyomi.domain.entries.anime.model.SeasonAnime
 import tachiyomi.domain.entries.anime.model.SeasonDisplayMode
+import tachiyomi.i18n.MR
+import tachiyomi.presentation.core.i18n.stringResource
+import eu.kanade.presentation.util.formatEpisodeNumber
 
 @Composable
 fun AnimeSeasonListItem(
@@ -24,8 +27,13 @@ fun AnimeSeasonListItem(
     listItemModifier: Modifier = Modifier,
 ) {
     val itemAnime = item.seasonAnime.anime
-    val title = itemAnime.title
-    val gridMode = SeasonDisplayMode.fromLong(anime.seasonDisplayGridMode)
+    val title = if (anime.seasonDisplayMode == Anime.SEASON_DISPLAY_MODE_NUMBER) {
+        val seasonNumber = itemAnime.seasonNumber
+        stringResource(MR.strings.display_mode_episode, formatEpisodeNumber(seasonNumber))
+    } else {
+        itemAnime.title
+    }
+    val gridMode = anime.seasonDisplayGridMode
 
     when (gridMode) {
         SeasonDisplayMode.ComfortableGrid -> {

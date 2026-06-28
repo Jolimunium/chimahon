@@ -12,6 +12,8 @@ data class Episode(
     val sourceOrder: Long,
     val url: String,
     val name: String,
+    val summary: String?,
+    val previewUrl: String?,
     val dateUpload: Long,
     val episodeNumber: Double,
     val scanlator: String?,
@@ -24,6 +26,8 @@ data class Episode(
     fun copyFrom(other: Episode): Episode {
         return copy(
             name = other.name,
+            summary = other.summary?.ifBlank { null },
+            previewUrl = other.previewUrl?.ifBlank { null },
             url = other.url,
             dateUpload = other.dateUpload,
             episodeNumber = other.episodeNumber,
@@ -44,6 +48,8 @@ data class Episode(
             sourceOrder = 0,
             url = "",
             name = "",
+            summary = null,
+            previewUrl = null,
             dateUpload = -1,
             episodeNumber = -1.0,
             scanlator = null,

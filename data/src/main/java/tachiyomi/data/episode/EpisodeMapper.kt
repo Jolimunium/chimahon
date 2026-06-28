@@ -21,9 +21,7 @@ object EpisodeMapper {
         version: Long,
         @Suppress("UNUSED_PARAMETER")
         isSyncing: Long,
-        @Suppress("UNUSED_PARAMETER")
         summary: String?,
-        @Suppress("UNUSED_PARAMETER")
         previewUrl: String?,
         fillermark: Boolean,
     ): Episode = Episode(
@@ -38,6 +36,8 @@ object EpisodeMapper {
         sourceOrder = sourceOrder,
         url = url,
         name = name,
+        summary = summary,
+        previewUrl = previewUrl,
         dateUpload = dateUpload,
         episodeNumber = episodeNumber,
         scanlator = scanlator,

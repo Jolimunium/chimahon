@@ -27,11 +27,6 @@ import eu.kanade.domain.entries.anime.model.seasonStartedFilter
 import eu.kanade.domain.entries.anime.model.seasonCompletedFilter
 import eu.kanade.domain.entries.anime.model.seasonBookmarkedFilter
 import eu.kanade.domain.entries.anime.model.seasonFillermarkedFilter
-import eu.kanade.domain.entries.anime.model.seasonDownloadedOverlay
-import eu.kanade.domain.entries.anime.model.seasonUnseenOverlay
-import eu.kanade.domain.entries.anime.model.seasonLocalOverlay
-import eu.kanade.domain.entries.anime.model.seasonLangOverlay
-import eu.kanade.domain.entries.anime.model.seasonContinueOverlay
 import eu.kanade.presentation.components.TabbedDialog
 import eu.kanade.presentation.components.TabbedDialogPaddings
 import kotlinx.collections.immutable.persistentListOf
@@ -140,9 +135,7 @@ fun SeasonSettingsDialog(
                 }
                 2 -> {
                     SeasonDisplayPage(
-                        displayGridMode = anime?.seasonDisplayGridMode?.let {
-                            runCatching { SeasonDisplayMode.fromLong(it) }.getOrDefault(SeasonDisplayMode.CompactGrid)
-                        } ?: SeasonDisplayMode.CompactGrid,
+                        displayGridMode = anime?.seasonDisplayGridMode ?: SeasonDisplayMode.CompactGrid,
                         displayGridModeChange = onDisplayGridModeChanged,
                         displayGridModeSize = anime?.seasonDisplayGridSize ?: 0,
                         displayGridModeSizeChange = onDisplayGridSizeChanged,

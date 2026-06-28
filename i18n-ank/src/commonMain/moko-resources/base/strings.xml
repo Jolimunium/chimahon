@@ -226,4 +226,11 @@
 
     <string name="action_clear_anime">Clear anime</string>
     <string name="episodes_from_database">Episodes &amp; History from Database</string>
+
+    <string name="choose_video_quality">Choose video quality:</string>
+    <string name="copied_video_link_to_clipboard">Copied video quality link to clipboard</string>
+    <string name="action_start_download_internally">Use internal downloader</string>
+    <string name="action_start_download_externally">Use external downloader</string>
+
+    <string name="season_settings_updated">Updated default season settings</string>
 </resources>

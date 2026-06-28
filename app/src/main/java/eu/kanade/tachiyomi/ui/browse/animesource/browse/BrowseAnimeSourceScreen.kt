@@ -61,6 +61,9 @@ import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.source.local.entries.anime.LocalAnimeSource
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.receiveAsFlow
 
 data class BrowseAnimeSourceScreen(
     val sourceId: Long,
@@ -116,6 +119,16 @@ data class BrowseAnimeSourceScreen(
 
         LaunchedEffect(screenModel.source) {
             assistUrl = (screenModel.source as? AnimeHttpSource)?.baseUrl
+        }
+
+        LaunchedEffect(Unit) {
+            queryEvent.receiveAsFlow()
+                .collectLatest {
+                    when (it) {
+                        is SearchType.Genre -> screenModel.searchGenre(it.txt)
+                        is SearchType.Text -> screenModel.search(it.txt)
+                    }
+                }
         }
 
         var topBarHeight by remember { mutableIntStateOf(0) }
@@ -255,5 +268,17 @@ data class BrowseAnimeSourceScreen(
             }
             else -> {}
         }
+    }
+
+    suspend fun search(query: String) = queryEvent.send(SearchType.Text(query))
+    suspend fun searchGenre(name: String) = queryEvent.send(SearchType.Genre(name))
+
+    companion object {
+        private val queryEvent = Channel<SearchType>()
+    }
+
+    sealed class SearchType(val txt: String) {
+        class Text(txt: String) : SearchType(txt)
+        class Genre(txt: String) : SearchType(txt)
     }
 }

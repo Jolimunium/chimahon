@@ -79,21 +79,6 @@ val Anime.seasonFillermarkedFilter: TriState
         else -> TriState.DISABLED
     }
 
-val Anime.seasonDownloadedOverlay: Boolean
-    get() = seasonFlags and Anime.SEASON_OVERLAY_DOWNLOADED_MASK != 0L
-
-val Anime.seasonUnseenOverlay: Boolean
-    get() = seasonFlags and Anime.SEASON_OVERLAY_UNSEEN_MASK != 0L
-
-val Anime.seasonLocalOverlay: Boolean
-    get() = seasonFlags and Anime.SEASON_OVERLAY_LOCAL_MASK != 0L
-
-val Anime.seasonLangOverlay: Boolean
-    get() = seasonFlags and Anime.SEASON_OVERLAY_LANG_MASK != 0L
-
-val Anime.seasonContinueOverlay: Boolean
-    get() = seasonFlags and Anime.SEASON_OVERLAY_CONT_MASK != 0L
-
 fun Anime.seasonsFiltered(): Boolean {
     return seasonDownloadedFilter != TriState.DISABLED ||
         seasonUnseenFilter != TriState.DISABLED ||

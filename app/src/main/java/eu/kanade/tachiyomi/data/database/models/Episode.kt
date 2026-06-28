@@ -49,6 +49,8 @@ fun Episode.toDomainEpisode(): DomainEpisode? {
         sourceOrder = source_order.toLong(),
         url = url,
         name = name,
+        summary = summary,
+        previewUrl = preview_url,
         dateUpload = date_upload,
         episodeNumber = episode_number.toDouble(),
         scanlator = scanlator,

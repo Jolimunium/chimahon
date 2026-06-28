@@ -75,13 +75,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.mikepenz.markdown.model.markdownAnnotator
-import com.mikepenz.markdown.model.markdownAnnotatorConfig
-import eu.kanade.presentation.entries.anime.components.MarkdownRender
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import eu.kanade.presentation.components.DropdownMenu
-import eu.kanade.tachiyomi.R
 import eu.kanade.presentation.entries.components.DotSeparatorText
+import eu.kanade.presentation.entries.components.ItemCover
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.animesource.model.SAnime
+import eu.kanade.tachiyomi.data.coil.useBackground
 import eu.kanade.tachiyomi.util.system.copyToClipboard
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.i18n.MR
@@ -95,6 +96,8 @@ import tachiyomi.presentation.core.util.secondaryItemAlpha
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
+
+private val whitespaceLineRegex = Regex("[\\r\\n]{2,}", setOf(RegexOption.MULTILINE))
 
 @Composable
 fun AnimeInfoBox(
@@ -114,7 +117,11 @@ fun AnimeInfoBox(
             MaterialTheme.colorScheme.background,
         )
         AsyncImage(
-            model = anime,
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(anime)
+                .useBackground(true)
+                .crossfade(true)
+                .build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -163,7 +170,7 @@ fun AnimeActionRow(
     onAddToLibraryClicked: () -> Unit,
     onWebViewClicked: (() -> Unit)?,
     onWebViewLongClicked: (() -> Unit)?,
-    onTrackingClicked: () -> Unit,
+    onTrackingClicked: (() -> Unit)?,
     onEditIntervalClicked: (() -> Unit)?,
     onEditCategory: (() -> Unit)?,
     modifier: Modifier = Modifier,
@@ -206,16 +213,18 @@ fun AnimeActionRow(
             color = if (isUserIntervalMode) MaterialTheme.colorScheme.primary else defaultActionButtonColor,
             onClick = { onEditIntervalClicked?.invoke() },
         )
-        AnimeActionButton(
-            title = if (trackingCount == 0) {
-                stringResource(MR.strings.manga_tracking_tab)
-            } else {
-                pluralStringResource(MR.plurals.num_trackers, count = trackingCount, trackingCount)
-            },
-            icon = if (trackingCount == 0) Icons.Outlined.Sync else Icons.Outlined.Done,
-            color = if (trackingCount == 0) defaultActionButtonColor else MaterialTheme.colorScheme.primary,
-            onClick = onTrackingClicked,
-        )
+        if (onTrackingClicked != null) {
+            AnimeActionButton(
+                title = if (trackingCount == 0) {
+                    stringResource(MR.strings.manga_tracking_tab)
+                } else {
+                    pluralStringResource(MR.plurals.num_trackers, count = trackingCount, trackingCount)
+                },
+                icon = if (trackingCount == 0) Icons.Outlined.Sync else Icons.Outlined.Done,
+                color = if (trackingCount == 0) defaultActionButtonColor else MaterialTheme.colorScheme.primary,
+                onClick = onTrackingClicked,
+            )
+        }
 
         if (onWebViewClicked != null) {
             AnimeActionButton(
@@ -243,10 +252,17 @@ fun ExpandableAnimeDescription(
             mutableStateOf(defaultExpandState)
         }
         val desc =
-            description.takeIf { !it.isNullOrBlank() } ?: stringResource(MR.strings.description_placeholder)
-
+            description.takeIf { !it.isNullOrBlank() } ?: stringResource(
+                MR.strings.description_placeholder,
+            )
+        val trimmedDescription = remember(desc) {
+            desc
+                .replace(whitespaceLineRegex, "\n")
+                .trimEnd()
+        }
         AnimeSummary(
-            description = desc,
+            expandedDescription = desc,
+            shrunkDescription = trimmedDescription,
             expanded = expanded,
             modifier = Modifier
                 .padding(top = 8.dp)
@@ -336,9 +352,12 @@ private fun AnimeAndSourceTitlesLarge(
             .padding(start = 16.dp, top = appBarPadding + 16.dp, end = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        AnimeCover.Book(
+        ItemCover.Book(
             modifier = Modifier.fillMaxWidth(0.65f),
-            data = anime,
+            data = ImageRequest.Builder(LocalContext.current)
+                .data(anime)
+                .crossfade(true)
+                .build(),
             contentDescription = stringResource(MR.strings.manga_cover),
             onClick = onCoverClick,
         )
@@ -372,11 +391,14 @@ private fun AnimeAndSourceTitlesSmall(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AnimeCover.Book(
+        ItemCover.Book(
             modifier = Modifier
                 .sizeIn(maxWidth = 100.dp)
                 .align(Alignment.Top),
-            data = anime,
+            data = ImageRequest.Builder(LocalContext.current)
+                .data(anime)
+                .crossfade(true)
+                .build(),
             contentDescription = stringResource(MR.strings.manga_cover),
             onClick = onCoverClick,
         )
@@ -542,23 +564,10 @@ private fun ColumnScope.AnimeContentInfo(
     }
 }
 
-private val descriptionAnnotator = markdownAnnotator(
-    annotate = { content, child ->
-        if (child.type in DISALLOWED_MARKDOWN_TYPES) {
-            append(content.substring(child.startOffset, child.endOffset))
-            return@markdownAnnotator true
-        }
-
-        false
-    },
-    config = markdownAnnotatorConfig(
-        eolAsNewLine = true,
-    ),
-)
-
 @Composable
 private fun AnimeSummary(
-    description: String,
+    expandedDescription: String,
+    shrunkDescription: String,
     expanded: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -573,20 +582,19 @@ private fun AnimeSummary(
                 )
             },
             {
-                // expanded: calculate maximum size when expanded
-                MarkdownRender(
-                    content = description,
-                    modifier = Modifier.secondaryItemAlpha(),
-                    annotator = descriptionAnnotator,
+                Text(
+                    text = expandedDescription,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             },
             {
-                // actual: the actual displayed content
                 SelectionContainer {
-                    MarkdownRender(
-                        content = description,
+                    Text(
+                        text = if (expanded) expandedDescription else shrunkDescription,
+                        maxLines = Int.MAX_VALUE,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.secondaryItemAlpha(),
-                        annotator = descriptionAnnotator,
                     )
                 }
             },

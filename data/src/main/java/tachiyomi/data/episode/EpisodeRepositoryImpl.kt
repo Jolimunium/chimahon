@@ -30,8 +30,8 @@ class EpisodeRepositoryImpl(
                         dateFetch = episode.dateFetch,
                         dateUpload = episode.dateUpload,
                         version = episode.version,
-                        summary = null,
-                        previewUrl = null,
+                        summary = episode.summary,
+                        previewUrl = episode.previewUrl,
                         fillermark = episode.fillermark,
                     )
                     val lastInsertId = episodesQueries.selectLastInsertedRowId().executeAsOne()
@@ -72,8 +72,8 @@ class EpisodeRepositoryImpl(
                     episodeId = episodeUpdate.id,
                     version = episodeUpdate.version,
                     isSyncing = 0,
-                    summary = null,
-                    previewUrl = null,
+                    summary = episodeUpdate.summary,
+                    previewUrl = episodeUpdate.previewUrl,
                 )
             }
         }

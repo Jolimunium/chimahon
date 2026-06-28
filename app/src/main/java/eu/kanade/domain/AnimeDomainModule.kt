@@ -11,6 +11,7 @@ import tachiyomi.data.category.AnimeCategoryRepositoryImpl
 import tachiyomi.data.episode.EpisodeRepositoryImpl
 import tachiyomi.domain.entries.anime.interactor.GetAnime
 import tachiyomi.domain.entries.anime.interactor.FetchInterval
+import tachiyomi.domain.entries.anime.interactor.GetAnimeSeasonsByParentId
 import tachiyomi.domain.entries.anime.interactor.GetAnimeWithEpisodes
 import tachiyomi.domain.entries.anime.interactor.GetCustomAnimeInfo
 import tachiyomi.domain.entries.anime.interactor.GetDuplicateLibraryAnime
@@ -32,6 +33,7 @@ import tachiyomi.domain.category.interactor.HideAnimeCategory
 import tachiyomi.domain.category.interactor.RenameAnimeCategory
 import tachiyomi.domain.category.interactor.ReorderAnimeCategory
 import tachiyomi.domain.category.interactor.SetAnimeCategories
+import tachiyomi.domain.category.interactor.SetSortModeForAnimeCategory
 import tachiyomi.domain.category.repository.AnimeCategoryRepository
 import eu.kanade.domain.episode.interactor.SyncEpisodesWithSource
 import tachiyomi.domain.episode.interactor.FilterEpisodesForDownload
@@ -39,6 +41,7 @@ import tachiyomi.domain.episode.interactor.GetEpisode
 import tachiyomi.domain.episode.interactor.GetEpisodesByAnimeId
 import tachiyomi.domain.episode.interactor.SetAnimeDefaultEpisodeFlags
 import tachiyomi.domain.episode.interactor.SetSeenStatus as DomainSetSeenStatus
+import tachiyomi.domain.season.interactor.SetAnimeDefaultSeasonFlags
 import tachiyomi.domain.episode.interactor.ShouldUpdateDbEpisode
 import tachiyomi.domain.episode.interactor.UpdateEpisode
 import tachiyomi.domain.episode.repository.EpisodeRepository
@@ -60,6 +63,7 @@ class AnimeDomainModule : InjektModule {
         addSingletonFactory<CustomAnimeRepository> { CustomAnimeRepositoryImpl(get()) }
         addFactory { GetAnime(get()) }
         addFactory { FetchInterval(get()) }
+        addFactory { GetAnimeSeasonsByParentId(get()) }
         addFactory { GetAnimeWithEpisodes(get(), get()) }
         addFactory { GetCustomAnimeInfo(get()) }
         addFactory { DomainUpdateAnime(get()) }
@@ -78,6 +82,7 @@ class AnimeDomainModule : InjektModule {
         addFactory { GetEpisodesByAnimeId(get()) }
         addFactory { UpdateEpisode(get()) }
         addFactory { SetAnimeDefaultEpisodeFlags(get(), get(), get()) }
+        addFactory { SetAnimeDefaultSeasonFlags(get(), get(), get()) }
         addFactory { DomainSetSeenStatus(get()) }
         addFactory { AppSetSeenStatus(get(), get()) }
         addFactory { ShouldUpdateDbEpisode() }
@@ -93,6 +98,7 @@ class AnimeDomainModule : InjektModule {
         addFactory { ReorderAnimeCategory(get()) }
         addFactory { HideAnimeCategory(get()) }
         addFactory { SetAnimeCategories(get()) }
+        addFactory { SetSortModeForAnimeCategory(get(), get()) }
 
         addSingletonFactory { AnimeLibraryPreferences(get()) }
 

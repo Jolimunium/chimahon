@@ -12,10 +12,11 @@ import coil3.fetch.SourceFetchResult
 import coil3.getOrDefault
 import coil3.request.Options
 import com.hippo.unifile.UniFile
-import eu.kanade.tachiyomi.data.cache.CoverCache
-import eu.kanade.tachiyomi.data.coil.AnimeCoverFetcher.Companion.USE_CUSTOM_COVER_KEY
+import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
+import eu.kanade.tachiyomi.data.cache.AnimeBackgroundCache
+import eu.kanade.tachiyomi.data.cache.AnimeCoverCache
+import eu.kanade.tachiyomi.data.coil.AnimeImageFetcher.Companion.USE_CUSTOM_COVER_KEY
 import eu.kanade.tachiyomi.network.await
-import eu.kanade.tachiyomi.source.online.HttpSource
 import logcat.LogPriority
 import okhttp3.CacheControl
 import okhttp3.Call
@@ -30,19 +31,19 @@ import okio.source
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.anime.model.AnimeCover
-import tachiyomi.domain.source.service.SourceManager
+import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import uy.kohesive.injekt.injectLazy
 import java.io.File
 import java.io.IOException
 
-class AnimeCoverFetcher(
+class AnimeImageFetcher(
     private val url: String?,
     private val isLibraryAnime: Boolean,
     private val options: Options,
     private val coverFileLazy: Lazy<File?>,
     private val customCoverFileLazy: Lazy<File>,
     private val diskCacheKeyLazy: Lazy<String>,
-    private val sourceLazy: Lazy<HttpSource?>,
+    private val sourceLazy: Lazy<AnimeHttpSource?>,
     private val callFactoryLazy: Lazy<Call.Factory>,
     private val imageLoader: ImageLoader,
 ) : Fetcher {
@@ -61,11 +62,21 @@ class AnimeCoverFetcher(
 
         if (url == null) error("No cover specified")
         return when (getResourceType(url)) {
-            Type.File -> fileLoader(File(url.substringAfter("file://")))
-            Type.URI -> fileUriLoader(url)
             Type.URL -> httpLoader()
+            Type.File -> fileLoader(File(url.substringAfter("file://")))
+            Type.URI -> uniFileLoader(url)
             null -> error("Invalid image")
         }
+    }
+
+    private fun uniFileLoader(urlString: String): FetchResult {
+        val uniFile = UniFile.fromUri(options.context, urlString.toUri())!!
+        val tempFile = uniFile.openInputStream().source().buffer()
+        return SourceFetchResult(
+            source = ImageSource(source = tempFile, fileSystem = FileSystem.SYSTEM),
+            mimeType = "image/*",
+            dataSource = DataSource.DISK,
+        )
     }
 
     private fun fileLoader(file: File): FetchResult {
@@ -75,18 +86,6 @@ class AnimeCoverFetcher(
                 fileSystem = FileSystem.SYSTEM,
                 diskCacheKey = diskCacheKey,
             ),
-            mimeType = "image/*",
-            dataSource = DataSource.DISK,
-        )
-    }
-
-    private fun fileUriLoader(uri: String): FetchResult {
-        val source = UniFile.fromUri(options.context, uri.toUri())!!
-            .openInputStream()
-            .source()
-            .buffer()
-        return SourceFetchResult(
-            source = ImageSource(source = source, fileSystem = FileSystem.SYSTEM),
             mimeType = "image/*",
             dataSource = DataSource.DISK,
         )
@@ -279,18 +278,34 @@ class AnimeCoverFetcher(
         private val callFactoryLazy: Lazy<Call.Factory>,
     ) : Fetcher.Factory<Anime> {
 
-        private val coverCache: CoverCache by injectLazy()
-        private val sourceManager: SourceManager by injectLazy()
+        private val coverCache: AnimeCoverCache by injectLazy()
+        private val backgroundCache: AnimeBackgroundCache by injectLazy()
+        private val sourceManager: AnimeSourceManager by injectLazy()
 
         override fun create(data: Anime, options: Options, imageLoader: ImageLoader): Fetcher {
-            return AnimeCoverFetcher(
-                url = data.thumbnailUrl,
+            val isBackground = options.useBackground
+            val url = if (isBackground) data.backgroundUrl else data.thumbnailUrl
+
+            val coverCacheLazy = if (isBackground) {
+                lazy { backgroundCache.getBackgroundFile(url) }
+            } else {
+                lazy { coverCache.getCoverFile(url) }
+            }
+
+            val customCoverCacheLazy = if (isBackground) {
+                lazy { backgroundCache.getCustomBackgroundFile(data.id) }
+            } else {
+                lazy { coverCache.getCustomCoverFile(data.id) }
+            }
+
+            return AnimeImageFetcher(
+                url = url,
                 isLibraryAnime = data.favorite,
                 options = options,
-                coverFileLazy = lazy { coverCache.getCoverFile(data.thumbnailUrl) },
-                customCoverFileLazy = lazy { coverCache.getCustomCoverFile(data.id) },
+                coverFileLazy = coverCacheLazy,
+                customCoverFileLazy = customCoverCacheLazy,
                 diskCacheKeyLazy = lazy { imageLoader.components.key(data, options)!! },
-                sourceLazy = lazy { sourceManager.get(data.source) as? HttpSource },
+                sourceLazy = lazy { sourceManager.get(data.source) as? AnimeHttpSource },
                 callFactoryLazy = callFactoryLazy,
                 imageLoader = imageLoader,
             )
@@ -301,18 +316,18 @@ class AnimeCoverFetcher(
         private val callFactoryLazy: Lazy<Call.Factory>,
     ) : Fetcher.Factory<AnimeCover> {
 
-        private val coverCache: CoverCache by injectLazy()
-        private val sourceManager: SourceManager by injectLazy()
+        private val coverCache: AnimeCoverCache by injectLazy()
+        private val sourceManager: AnimeSourceManager by injectLazy()
 
         override fun create(data: AnimeCover, options: Options, imageLoader: ImageLoader): Fetcher {
-            return AnimeCoverFetcher(
+            return AnimeImageFetcher(
                 url = data.url,
                 isLibraryAnime = data.isAnimeFavorite,
                 options = options,
                 coverFileLazy = lazy { coverCache.getCoverFile(data.url) },
                 customCoverFileLazy = lazy { coverCache.getCustomCoverFile(data.animeId) },
                 diskCacheKeyLazy = lazy { imageLoader.components.key(data, options)!! },
-                sourceLazy = lazy { sourceManager.get(data.sourceId) as? HttpSource },
+                sourceLazy = lazy { sourceManager.get(data.sourceId) as? AnimeHttpSource },
                 callFactoryLazy = callFactoryLazy,
                 imageLoader = imageLoader,
             )

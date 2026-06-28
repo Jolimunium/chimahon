@@ -1,38 +1,55 @@
 package eu.kanade.presentation.entries.anime.library
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalConfiguration
 import eu.kanade.presentation.components.TabbedDialog
 import eu.kanade.presentation.components.TabbedDialogPaddings
+import eu.kanade.tachiyomi.ui.entries.anime.library.AnimeLibrarySettingsScreenModel
 import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.core.common.preference.TriState
+import tachiyomi.domain.category.model.AnimeCategory
 import tachiyomi.domain.library.model.LibraryDisplayMode
 import tachiyomi.domain.library.model.LibrarySort
-import tachiyomi.domain.library.service.AnimeLibraryPreferences
+import tachiyomi.domain.library.model.sort
+import tachiyomi.i18n.MR
+import tachiyomi.presentation.core.components.BaseSortItem
+import tachiyomi.presentation.core.components.CheckboxItem
+import tachiyomi.presentation.core.components.HeadingItem
+import tachiyomi.presentation.core.components.SettingsChipRow
+import tachiyomi.presentation.core.components.SliderItem
 import tachiyomi.presentation.core.components.SortItem
 import tachiyomi.presentation.core.components.TriStateItem
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
+import tachiyomi.presentation.core.i18n.stringResource
+import tachiyomi.presentation.core.util.collectAsState
 
 @Composable
 fun AnimeLibrarySettingsDialog(
     onDismissRequest: () -> Unit,
-    preferences: AnimeLibraryPreferences = Injekt.get(),
+    screenModel: AnimeLibrarySettingsScreenModel,
+    category: AnimeCategory?,
 ) {
     TabbedDialog(
         onDismissRequest = onDismissRequest,
-        tabTitles = persistentListOf("Filter", "Sort", "Display"),
+        tabTitles = persistentListOf(
+            stringResource(MR.strings.action_filter),
+            stringResource(MR.strings.action_sort),
+            stringResource(MR.strings.action_display),
+        ),
     ) { page ->
         Column(
             modifier = Modifier
@@ -40,81 +57,233 @@ fun AnimeLibrarySettingsDialog(
                 .verticalScroll(rememberScrollState()),
         ) {
             when (page) {
-                0 -> FilterTab(preferences)
-                1 -> SortTab(preferences)
-                2 -> DisplayTab(preferences)
+                0 -> FilterPage(
+                    screenModel = screenModel,
+                )
+                1 -> SortPage(
+                    category = category,
+                    screenModel = screenModel,
+                )
+                2 -> DisplayPage(
+                    screenModel = screenModel,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ColumnScope.FilterTab(preferences: AnimeLibraryPreferences) {
-    val filterUnseen by remember { preferences.filterUnseen().changes() }.collectAsState(preferences.filterUnseen().get())
-    val filterStarted by remember { preferences.filterStarted().changes() }.collectAsState(preferences.filterStarted().get())
-    val filterBookmarked by remember { preferences.filterBookmarked().changes() }.collectAsState(preferences.filterBookmarked().get())
-    val filterCompleted by remember { preferences.filterCompleted().changes() }.collectAsState(preferences.filterCompleted().get())
-    val filterDownloaded by remember { preferences.filterDownloaded().changes() }.collectAsState(preferences.filterDownloaded().get())
-    val filterFillermarked by remember { preferences.filterFillermarked().changes() }.collectAsState(preferences.filterFillermarked().get())
+private fun ColumnScope.FilterPage(
+    screenModel: AnimeLibrarySettingsScreenModel,
+) {
+    val filterDownloaded by screenModel.libraryPreferences.filterDownloaded().collectAsState()
+    val downloadedOnly by screenModel.preferences.downloadedOnly().collectAsState()
 
-    TriStateItem(label = "Unseen", state = filterUnseen, onClick = { preferences.filterUnseen().set(it) })
-    TriStateItem(label = "Started", state = filterStarted, onClick = { preferences.filterStarted().set(it) })
-    TriStateItem(label = "Bookmarked", state = filterBookmarked, onClick = { preferences.filterBookmarked().set(it) })
-    TriStateItem(label = "Completed", state = filterCompleted, onClick = { preferences.filterCompleted().set(it) })
-    TriStateItem(label = "Downloaded", state = filterDownloaded, onClick = { preferences.filterDownloaded().set(it) })
-    TriStateItem(label = "Fillermarked", state = filterFillermarked, onClick = { preferences.filterFillermarked().set(it) })
+    TriStateItem(
+        label = stringResource(MR.strings.label_downloaded),
+        state = if (downloadedOnly) {
+            TriState.ENABLED_IS
+        } else {
+            filterDownloaded
+        },
+        enabled = !downloadedOnly,
+        onClick = { screenModel.toggleFilter { it.filterDownloaded() } },
+    )
+    val filterUnseen by screenModel.libraryPreferences.filterUnseen().collectAsState()
+    TriStateItem(
+        label = stringResource(MR.strings.action_filter_unseen),
+        state = filterUnseen,
+        onClick = { screenModel.toggleFilter { it.filterUnseen() } },
+    )
+    val filterStarted by screenModel.libraryPreferences.filterStarted().collectAsState()
+    TriStateItem(
+        label = stringResource(MR.strings.label_started),
+        state = filterStarted,
+        onClick = { screenModel.toggleFilter { it.filterStarted() } },
+    )
+    val filterBookmarked by screenModel.libraryPreferences.filterBookmarked().collectAsState()
+    TriStateItem(
+        label = stringResource(MR.strings.action_filter_bookmarked),
+        state = filterBookmarked,
+        onClick = { screenModel.toggleFilter { it.filterBookmarked() } },
+    )
+    val filterCompleted by screenModel.libraryPreferences.filterCompleted().collectAsState()
+    TriStateItem(
+        label = stringResource(MR.strings.completed),
+        state = filterCompleted,
+        onClick = { screenModel.toggleFilter { it.filterCompleted() } },
+    )
+
+    val trackers by screenModel.trackersFlow.collectAsState()
+    when (trackers.size) {
+        0 -> {
+            // No trackers
+        }
+        1 -> {
+            val service = trackers[0]
+            val filterTracker by screenModel.libraryPreferences.filterTracking(
+                service.id.toInt(),
+            ).collectAsState()
+            TriStateItem(
+                label = stringResource(MR.strings.action_filter_tracked),
+                state = filterTracker,
+                onClick = { screenModel.toggleTracker(service.id.toInt()) },
+            )
+        }
+        else -> {
+            HeadingItem(MR.strings.action_filter_tracked)
+            trackers.map { service ->
+                val filterTracker by screenModel.libraryPreferences.filterTracking(
+                    service.id.toInt(),
+                ).collectAsState()
+                TriStateItem(
+                    label = service.name,
+                    state = filterTracker,
+                    onClick = { screenModel.toggleTracker(service.id.toInt()) },
+                )
+            }
+        }
+    }
 }
 
 @Composable
-private fun ColumnScope.SortTab(preferences: AnimeLibraryPreferences) {
-    val sortMode by remember { preferences.sortingMode().changes() }.collectAsState(preferences.sortingMode().get())
+private fun ColumnScope.SortPage(
+    category: AnimeCategory?,
+    screenModel: AnimeLibrarySettingsScreenModel,
+) {
+    val trackers by screenModel.trackersFlow.collectAsState()
+    val sortingMode = category.sort.type
+    val sortDescending = !category.sort.isAscending
 
-    val sortTypes = listOf(
-        LibrarySort.Type.Alphabetical to "Alphabetical",
-        LibrarySort.Type.LastRead to "Last watched",
-        LibrarySort.Type.LastUpdate to "Last update",
-        LibrarySort.Type.UnreadCount to "Unseen count",
-        LibrarySort.Type.TotalChapters to "Total episodes",
-        LibrarySort.Type.LatestChapter to "Latest episode",
-        LibrarySort.Type.ChapterFetchDate to "Episode fetch date",
-        LibrarySort.Type.DateAdded to "Date added",
-    )
+    val options = remember(trackers.isEmpty()) {
+        val trackerMeanPair = if (trackers.isNotEmpty()) {
+            MR.strings.action_sort_tracker_score to LibrarySort.Type.TrackerMean
+        } else {
+            null
+        }
+        listOfNotNull(
+            MR.strings.action_sort_alpha to LibrarySort.Type.Alphabetical,
+            MR.strings.action_sort_total_episodes to LibrarySort.Type.TotalChapters,
+            MR.strings.action_sort_last_seen to LibrarySort.Type.LastRead,
+            MR.strings.action_sort_last_anime_update to LibrarySort.Type.LastUpdate,
+            MR.strings.action_sort_unseen_count to LibrarySort.Type.UnreadCount,
+            MR.strings.action_sort_latest_episode to LibrarySort.Type.LatestChapter,
+            MR.strings.action_sort_episode_fetch_date to LibrarySort.Type.ChapterFetchDate,
+            MR.strings.action_sort_date_added to LibrarySort.Type.DateAdded,
+            trackerMeanPair,
+            MR.strings.action_sort_random to LibrarySort.Type.Random,
+        )
+    }
 
-    sortTypes.forEach { (type, label) ->
-        val sortDescending = if (sortMode.type == type) !sortMode.isAscending else null
+    options.map { (titleRes, mode) ->
+        if (mode == LibrarySort.Type.Random) {
+            BaseSortItem(
+                label = stringResource(titleRes),
+                icon = Icons.Default.Refresh
+                    .takeIf { sortingMode == LibrarySort.Type.Random },
+                onClick = {
+                    screenModel.setSort(category, mode, LibrarySort.Direction.Ascending)
+                },
+            )
+            return@map
+        }
         SortItem(
-            label = label,
-            sortDescending = sortDescending,
+            label = stringResource(titleRes),
+            sortDescending = sortDescending.takeIf { sortingMode == mode },
             onClick = {
-                val newDirection = if (sortMode.type == type) {
-                    if (sortMode.isAscending) LibrarySort.Direction.Descending
-                    else LibrarySort.Direction.Ascending
-                } else {
-                    LibrarySort.Direction.Ascending
+                val isTogglingDirection = sortingMode == mode
+                val direction = when {
+                    isTogglingDirection -> if (sortDescending) {
+                        LibrarySort.Direction.Ascending
+                    } else {
+                        LibrarySort.Direction.Descending
+                    }
+                    else -> if (sortDescending) {
+                        LibrarySort.Direction.Descending
+                    } else {
+                        LibrarySort.Direction.Ascending
+                    }
                 }
-                preferences.sortingMode().set(LibrarySort(type, newDirection))
+                screenModel.setSort(category, mode, direction)
             },
         )
     }
 }
 
-@Composable
-private fun ColumnScope.DisplayTab(preferences: AnimeLibraryPreferences) {
-    val displayMode by remember { preferences.displayMode().changes() }.collectAsState(preferences.displayMode().get())
+private val displayModes = listOf(
+    MR.strings.action_display_grid to LibraryDisplayMode.CompactGrid,
+    MR.strings.action_display_comfortable_grid to LibraryDisplayMode.ComfortableGrid,
+    MR.strings.action_display_cover_only_grid to LibraryDisplayMode.CoverOnlyGrid,
+    MR.strings.action_display_list to LibraryDisplayMode.List,
+)
 
-    val modes = listOf(
-        LibraryDisplayMode.CompactGrid to "Compact grid",
-        LibraryDisplayMode.ComfortableGrid to "Comfortable grid",
-        LibraryDisplayMode.List to "List",
-        LibraryDisplayMode.CoverOnlyGrid to "Cover only",
+@Composable
+private fun ColumnScope.DisplayPage(
+    screenModel: AnimeLibrarySettingsScreenModel,
+) {
+    val displayMode by screenModel.libraryPreferences.displayMode().collectAsState()
+    SettingsChipRow(MR.strings.action_display_mode) {
+        displayModes.map { (titleRes, mode) ->
+            FilterChip(
+                selected = displayMode == mode,
+                onClick = { screenModel.setDisplayMode(mode) },
+                label = { Text(stringResource(titleRes)) },
+            )
+        }
+    }
+
+    val configuration = LocalConfiguration.current
+    val columnPreference = remember {
+        if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            screenModel.libraryPreferences.landscapeColumns()
+        } else {
+            screenModel.libraryPreferences.portraitColumns()
+        }
+    }
+
+    val columns by columnPreference.collectAsState()
+    SliderItem(
+        value = columns,
+        valueRange = 0..10,
+        label = stringResource(MR.strings.pref_library_columns),
+        valueString = if (columns > 0) {
+            columns.toString()
+        } else {
+            stringResource(MR.strings.label_auto)
+        },
+        onChange = columnPreference::set,
+        pillColor = MaterialTheme.colorScheme.surfaceContainerHighest,
     )
 
-    modes.forEach { (mode, label) ->
-        FilterChip(
-            selected = displayMode == mode,
-            onClick = { preferences.displayMode().set(mode) },
-            label = { Text(label) },
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-    }
+    HeadingItem(MR.strings.overlay_header)
+    CheckboxItem(
+        label = stringResource(MR.strings.action_display_download_badge_anime),
+        pref = screenModel.libraryPreferences.downloadBadge(),
+    )
+    CheckboxItem(
+        label = stringResource(MR.strings.action_display_unseen_badge),
+        pref = screenModel.libraryPreferences.unseenBadge(),
+    )
+    CheckboxItem(
+        label = stringResource(MR.strings.action_display_local_badge),
+        pref = screenModel.libraryPreferences.localBadge(),
+    )
+    CheckboxItem(
+        label = stringResource(MR.strings.action_display_language_badge),
+        pref = screenModel.libraryPreferences.languageBadge(),
+    )
+    CheckboxItem(
+        label = stringResource(MR.strings.action_display_show_continue_reading_button),
+        pref = screenModel.libraryPreferences.showContinueWatchingButton(),
+    )
+
+    HeadingItem(MR.strings.tabs_header)
+    CheckboxItem(
+        label = stringResource(MR.strings.action_display_show_tabs),
+        pref = screenModel.libraryPreferences.categoryTabs(),
+    )
+    CheckboxItem(
+        label = stringResource(MR.strings.action_display_show_number_of_items),
+        pref = screenModel.libraryPreferences.categoryNumberOfItems(),
+    )
 }

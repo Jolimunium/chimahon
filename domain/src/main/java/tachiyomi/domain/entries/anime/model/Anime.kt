@@ -124,14 +124,49 @@ data class Anime(
         return seasonFlags and SEASON_SORT_DIR_MASK == SEASON_SORT_DESC
     }
 
-    val seasonDisplayGridMode: Long
-        get() = (seasonFlags and SEASON_GRID_DISPLAY_MODE_MASK) shr SEASON_GRID_DISPLAY_MODE_BIT_OFFSET
+    val seasonDisplayGridMode: SeasonDisplayMode
+        get() = SeasonDisplayMode.fromLong(
+            (seasonFlags and SEASON_GRID_DISPLAY_MODE_MASK) shr SEASON_GRID_DISPLAY_MODE_BIT_OFFSET,
+        )
 
     val seasonDisplayGridSize: Int
         get() = ((seasonFlags and SEASON_GRID_DISPLAY_SIZE_MASK) shr SEASON_GRID_DISPLAY_SIZE_BIT_OFFSET).toInt()
 
     val seasonDisplayMode: Long
         get() = seasonFlags and SEASON_DISPLAY_MODE_MASK
+
+    val seasonUnseenFilterRaw: Long
+        get() = seasonFlags and SEASON_UNSEEN_MASK
+
+    val seasonDownloadedFilterRaw: Long
+        get() = seasonFlags and SEASON_DOWNLOADED_MASK
+
+    val seasonBookmarkedFilterRaw: Long
+        get() = seasonFlags and SEASON_BOOKMARKED_MASK
+
+    val seasonFillermarkedFilterRaw: Long
+        get() = seasonFlags and SEASON_FILLERMARKED_MASK
+
+    val seasonStartedFilterRaw: Long
+        get() = seasonFlags and SEASON_STARTED_MASK
+
+    val seasonCompletedFilterRaw: Long
+        get() = seasonFlags and SEASON_COMPLETED_MASK
+
+    val seasonDownloadedOverlay: Boolean
+        get() = seasonFlags and SEASON_OVERLAY_DOWNLOADED_MASK == SEASON_OVERLAY_DOWNLOADED_MASK
+
+    val seasonUnseenOverlay: Boolean
+        get() = seasonFlags and SEASON_OVERLAY_UNSEEN_MASK == SEASON_OVERLAY_UNSEEN_MASK
+
+    val seasonLocalOverlay: Boolean
+        get() = seasonFlags and SEASON_OVERLAY_LOCAL_MASK == SEASON_OVERLAY_LOCAL_MASK
+
+    val seasonLangOverlay: Boolean
+        get() = seasonFlags and SEASON_OVERLAY_LANG_MASK == SEASON_OVERLAY_LANG_MASK
+
+    val seasonContinueOverlay: Boolean
+        get() = seasonFlags and SEASON_OVERLAY_CONT_MASK == SEASON_OVERLAY_CONT_MASK
 
     val unseenFilter: TriState
         get() = when (unseenFilterRaw) {
@@ -214,6 +249,7 @@ data class Anime(
         const val SEASON_GRID_DISPLAY_MODE_BIT_OFFSET = 4
         const val SEASON_GRID_DISPLAY_SIZE_MASK = 0x00000F00L
         const val SEASON_GRID_DISPLAY_SIZE_BIT_OFFSET = 8
+        const val SEASON_SORT_SOURCE = 0x00000000L
         const val SEASON_SORTING_SOURCE = 0x00000000L
         const val SEASON_SORTING_NUMBER = 0x00000100L
         const val SEASON_SORTING_UPLOAD_DATE = 0x00000200L
@@ -245,6 +281,7 @@ data class Anime(
         const val SEASON_OVERLAY_LANG_MASK = 0x00080000L
         const val SEASON_OVERLAY_CONT_MASK = 0x00100000L
         const val SEASON_DISPLAY_MODE_NUMBER = 0x01000000L
+        const val SEASON_DISPLAY_MODE_SOURCE = 0x00000000L
         const val SEASON_DISPLAY_MODE_MASK = 0x01000000L
 
         fun create() = Anime(

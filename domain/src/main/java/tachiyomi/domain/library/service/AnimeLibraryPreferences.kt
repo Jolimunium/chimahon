@@ -86,6 +86,8 @@ class AnimeLibraryPreferences(
 
     fun languageBadge() = preferenceStore.getBoolean("display_animelib_language_badge", false)
 
+    fun sourceBadge() = preferenceStore.getBoolean("display_animelib_source_badge", true)
+
     // endregion
 
     // region Category
