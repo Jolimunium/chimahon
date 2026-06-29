@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.dp
 import chimahon.HoshiDicts
 import chimahon.dictionary.readDictionaryIndex
 import com.canopus.chimareader.data.FontManager
+import com.hippo.unifile.UniFile
 import chimahon.anki.AnkiCardCreator
 import chimahon.anki.AnkiDroidBridge
 import chimahon.anki.AnkiProfile
@@ -303,7 +304,7 @@ object SettingsDictionaryScreen : SearchableSettings {
         }
 
         val importLauncher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.GetMultipleContents(),
+            contract = ActivityResultContracts.OpenMultipleDocuments(),
         ) { uris ->
             Log.d(TAG, "importLauncher: uris=${uris.size}")
             if (uris.isEmpty()) return@rememberLauncherForActivityResult
@@ -1091,7 +1092,7 @@ object SettingsDictionaryScreen : SearchableSettings {
 
     @Composable
     private fun getDictionaryListGroup(
-        importLauncher: androidx.activity.result.ActivityResultLauncher<String>? = null,
+        importLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>>? = null,
     ): Preference.PreferenceGroup {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
@@ -1285,7 +1286,7 @@ object SettingsDictionaryScreen : SearchableSettings {
                                     .padding(horizontal = 16.dp, vertical = 4.dp)
                                     .clickable {
                                         try {
-                                            importLauncher?.launch("application/zip")
+                                            importLauncher?.launch(arrayOf("application/zip"))
                                         } catch (_: ActivityNotFoundException) {
                                             context.toast(MR.strings.file_picker_error)
                                         }
@@ -2715,11 +2716,14 @@ private suspend fun importDictionaryFromUri(
                 )
             }
 
-            context.contentResolver.openInputStream(uri)?.use { input ->
+            val source = UniFile.fromUri(context, uri)
+                ?: return@withContext Pair(context.stringResource(MR.strings.file_null_uri_error), false)
+
+            source.openInputStream().use { input ->
                 tempZip.outputStream().use { output ->
                     input.copyTo(output)
                 }
-            } ?: return@withContext Pair(context.stringResource(MR.strings.file_null_uri_error), false)
+            }
 
             Log.d(TAG, "importDictionaryFromUri: calling HoshiDicts.importDictionary...")
             tempImportDir.mkdirs()

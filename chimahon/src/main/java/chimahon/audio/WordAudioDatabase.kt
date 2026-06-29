@@ -64,7 +64,7 @@ class WordAudioDatabase(private val context: Context) {
         return true
     }
 
-    /** Opens any SAF Uri — uses 4 attempts with increasing fallback. */
+    /** Opens any SAF Uri using a direct file descriptor, then a streamed private-file fallback. */
     fun updateUri(uri: Uri): Boolean {
         val key = uri.toString()
         if (key == currentUri && (handle != 0L || legacyDb != null)) return true
@@ -101,47 +101,25 @@ class WordAudioDatabase(private val context: Context) {
             Log.e(TAG, "Attempt 1/2 failed", e)
         }
 
-        // ── Attempt 3: UniFile in-memory (nativeOpenBytes) ────────
-        try {
-            val uniFile = UniFile.fromUri(context, uri)
-            if (uniFile != null) {
-                val bytes = uniFile.openInputStream()?.use { it.readBytes() }
-                if (bytes != null && bytes.isNotEmpty()) {
-                    val h = nativeOpenBytes(bytes)
-                    if (h != 0L) {
-                        handle = h
-                        currentUri = key
-                        Log.i(TAG, "Opened audio database (in-memory): $uri")
-                        return true
-                    }
-                    lastError = "File is not a valid audio database"
-                } else {
-                    lastError = "File is empty"
-                }
-            } else {
-                lastError = "Cannot access file"
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Attempt 3 failed", e)
-            lastError = "Could not read file: ${e.message}"
-        }
-
-        // ── Attempt 4 (LAST RESORT): copy to private + old SQLiteDatabase ──
+        // ── Attempt 3 (LAST RESORT): copy to private + old SQLiteDatabase ──
         val privateDir = context.getExternalFilesDir(null) ?: run {
             if (lastError == null) lastError = "No accessible storage directory"
             return false
         }
         val targetFile = File(privateDir, "word_audio.db")
         try {
-            context.contentResolver.openInputStream(uri)?.use { input ->
+            val source = UniFile.fromUri(context, uri) ?: run {
+                if (lastError == null) lastError = "Cannot access file"
+                return false
+            }
+
+            source.openInputStream().use { input ->
                 targetFile.outputStream().use { output ->
                     input.copyTo(output)
                     output.fd.sync()
                 }
-            } ?: run {
-                if (lastError == null) lastError = "Cannot read file"
-                return false
             }
+
             if (targetFile.exists() && targetFile.length() > 0) {
                 legacyDb = SQLiteDatabase.openDatabase(
                     targetFile.absolutePath,
@@ -159,7 +137,7 @@ class WordAudioDatabase(private val context: Context) {
             targetFile.delete()
             if (lastError == null) lastError = "File is not a valid audio database"
         } catch (e: Exception) {
-            Log.e(TAG, "Attempt 4 failed", e)
+            Log.e(TAG, "Attempt 3 failed", e)
             targetFile.delete()
             if (lastError == null) lastError = "Could not read file: ${e.message}"
         }
@@ -308,7 +286,6 @@ class WordAudioDatabase(private val context: Context) {
     }
 
     private external fun nativeOpen(fd: Int, size: Long): Long
-    private external fun nativeOpenBytes(data: ByteArray): Long
     private external fun nativeClose(handle: Long)
     private external fun nativeTestConnection(handle: Long): Boolean
     private external fun nativeFindEntries(
