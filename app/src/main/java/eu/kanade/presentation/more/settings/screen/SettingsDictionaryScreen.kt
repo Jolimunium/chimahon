@@ -413,7 +413,7 @@ object SettingsDictionaryScreen : SearchableSettings {
         }
 
         if (errorDialogText != null) {
-            val showPermissionButton = errorDialogText!!.contains("Manager: false")
+            val showPermissionButton = errorDialogText!!.contains("Storage permission is not granted")
             AlertDialog(
                 onDismissRequest = { errorDialogText = null },
                 title = { Text("Import Diagnostics") },
@@ -2897,17 +2897,22 @@ private fun openStreamWithFallback(context: Context, uri: Uri): java.io.InputStr
         Log.w("DictionaryImport", "Standard openInputStream failed for $uri, trying fallback", e)
     }
 
-    var resolvedPath: String? = null
-    var exists = false
-    var canRead = false
+    val isManager = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+        android.os.Environment.isExternalStorageManager()
+    } else {
+        true
+    }
+
+    if (!isManager) {
+        throw java.io.FileNotFoundException("Storage permission is not granted. Please allow 'All files access' in settings.")
+    }
+
     try {
-        resolvedPath = getPathFromUri(context, uri)
-        if (resolvedPath != null) {
-            val file = java.io.File(resolvedPath)
-            exists = file.exists()
-            canRead = file.canRead()
-            if (exists && canRead) {
-                Log.d("DictionaryImport", "Fallback succeeded using file path: $resolvedPath")
+        val path = getPathFromUri(context, uri)
+        if (path != null) {
+            val file = java.io.File(path)
+            if (file.exists() && file.canRead()) {
+                Log.d("DictionaryImport", "Fallback succeeded using file path: $path")
                 return java.io.FileInputStream(file)
             }
         }
@@ -2915,13 +2920,7 @@ private fun openStreamWithFallback(context: Context, uri: Uri): java.io.InputStr
         Log.e("DictionaryImport", "Fallback file path open failed for $uri", e)
     }
 
-    val isManager = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-        android.os.Environment.isExternalStorageManager()
-    } else {
-        true
-    }
-
-    throw java.io.FileNotFoundException("URI: $uri\nPath: $resolvedPath\nManager: $isManager | Exists: $exists | CanRead: $canRead")
+    throw java.io.FileNotFoundException("File is inaccessible or corrupted.")
 }
 
 private fun getPathFromUri(context: Context, uri: Uri): String? {
