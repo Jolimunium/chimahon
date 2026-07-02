@@ -113,15 +113,16 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
@@ -285,6 +286,7 @@ class PlayerViewModel @JvmOverloads constructor(
     val pos = _pos.asStateFlow()
 
     private var castProgressJob: Job? = null
+    private var standaloneYoutubeLoadJob: Job? = null
 
     val duration = MutableStateFlow(0f)
 
@@ -2237,6 +2239,7 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     private fun loadNormalStandalone(video: Video) {
+        standaloneYoutubeLoadJob?.cancel()
         val title = video.videoTitle.ifBlank { video.videoUrl.substringAfterLast('/').substringBefore('?') }
         animeTitle.update { title }
         mediaTitle.update { title }
@@ -2248,14 +2251,16 @@ class PlayerViewModel @JvmOverloads constructor(
     private fun loadYoutubeStandalone(video: Video) {
         videoClickHandler = ::onStandaloneYoutubeVideoClicked
         updateIsLoadingHosters(true)
-        viewModelScope.launchIO {
+        standaloneYoutubeLoadJob?.cancel()
+        standaloneYoutubeLoadJob = viewModelScope.launchIO {
             try {
                 val prefs = YouTubePreferences(Injekt.get<Application>())
                 val streams = YoutubeResolver.resolveAllStreams(video.videoPageUrl, prefs.preferredQuality)
+                if (!isActive) return@launchIO
                 if (streams.isEmpty()) {
                     withContext(Dispatchers.Main) {
                         updateIsLoadingHosters(false)
-                        activity.toast("No video streams found")
+                        activity.toast("No playable video streams found")
                     }
                     return@launchIO
                 }
@@ -2289,6 +2294,8 @@ class PlayerViewModel @JvmOverloads constructor(
                     _currentVideo.update { selected }
                     activity.setVideo(selected, position = 0L)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     updateIsLoadingHosters(false)
