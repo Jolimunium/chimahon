@@ -73,6 +73,7 @@ import eu.kanade.tachiyomi.ui.manga.RelatedManga.Companion.sorted
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.chapter.getNextUnread
 import eu.kanade.tachiyomi.util.removeCovers
+import eu.kanade.tachiyomi.util.updateLocalCoverFromSourceFetch
 import eu.kanade.tachiyomi.util.system.getBitmapOrNull
 import eu.kanade.tachiyomi.util.system.toast
 import exh.debug.DebugToggles
@@ -1226,7 +1227,8 @@ class MangaScreenModel(
                 // SY -->
                 if (state.source !is MergedSource) {
                     // SY <--
-                    val chapters = state.source.getChapterList(state.manga.toSManga())
+                    val sManga = state.manga.toSManga()
+                    val chapters = state.source.getChapterList(sManga)
 
                     val newChapters = syncChaptersWithSource.await(
                         chapters,
@@ -1234,6 +1236,7 @@ class MangaScreenModel(
                         state.source,
                         manualFetch,
                     )
+                    state.manga.updateLocalCoverFromSourceFetch(state.source, sManga, updateManga)
 
                     if (manualFetch) {
                         downloadNewChapters(newChapters)
