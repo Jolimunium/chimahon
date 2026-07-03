@@ -472,10 +472,21 @@ fun OcrLookupPopup(
                 )
                 if (ankiResult is AnkiResult.Success || ankiResult is AnkiResult.CardExists || ankiResult is AnkiResult.OpenCard) {
                     withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        updateStatus(result.term.expression)
-                        onDismiss()
-                        if (ankiResult is AnkiResult.Success) {
-                            onCropTriggered.invoke(ankiResult.noteId, glossaryIndex)
+                        when (ankiResult) {
+                            is AnkiResult.Success -> {
+                                updateStatus(result.term.expression)
+                                onDismiss()
+                                onCropTriggered.invoke(ankiResult.noteId, glossaryIndex)
+                            }
+                            is AnkiResult.CardExists -> {
+                                updateStatus(result.term.expression)
+                                context.toast(MR.strings.anki_card_exists)
+                            }
+                            is AnkiResult.OpenCard -> {
+                                updateStatus(result.term.expression)
+                                chimahon.anki.AnkiDroidBridge(context).guiEditNote(ankiResult.noteId)
+                            }
+                            else -> {}
                         }
                     }
                 } else {
