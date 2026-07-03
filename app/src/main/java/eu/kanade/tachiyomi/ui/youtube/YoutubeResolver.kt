@@ -91,7 +91,13 @@ class YoutubeResolver {
                 val audioTracks = runCatching {
                     extractor.audioStreams
                         .filter { it.content.isNotBlank() }
-                        .sortedByDescending { it.averageBitrate }
+                        .sortedWith(
+                            compareByDescending<org.schabi.newpipe.extractor.stream.AudioStream> {
+                                it.audioTrackName?.contains("original", ignoreCase = true) == true ||
+                                    it.audioLocale?.displayName?.contains("original", ignoreCase = true) == true ||
+                                    it.quality?.contains("original", ignoreCase = true) == true
+                            }.thenByDescending { it.averageBitrate },
+                        )
                         .map { audio ->
                             Track(
                                 url = audio.content,
@@ -101,10 +107,12 @@ class YoutubeResolver {
                                     ?: "Audio",
                             )
                         }
+                        .distinctBy { it.url to it.lang }
                 }.getOrDefault(emptyList())
 
                 val streams = (extractor.videoStreams + extractor.videoOnlyStreams)
                     .filter { it.content.isNotBlank() }
+                    .filter { !it.isVideoOnly() || audioTracks.isNotEmpty() }
                     .sortedWith(
                         compareByDescending<org.schabi.newpipe.extractor.stream.VideoStream> {
                             parseResolution(it.getResolution().ifBlank { it.quality.orEmpty() })
@@ -120,7 +128,6 @@ class YoutubeResolver {
                 val streamVideos = streams.mapNotNull { stream ->
                     val resolution = stream.getResolution().ifBlank { stream.quality ?: "Video" }
                     val needsExternalAudio = stream.isVideoOnly()
-                    if (needsExternalAudio && audioTracks.isEmpty()) return@mapNotNull null
 
                     Video(
                         videoUrl = stream.content,
