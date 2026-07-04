@@ -4,6 +4,14 @@ All notable changes to Chimahon are documented here.
 
 The format follows a Keep a Changelog style and uses Semantic Versioning.
 
+## [v2.1.3]
+
+### Changed
+- Move Lens native libraries to OCR model download
+
+### Fixed
+- Novel reader bookmark progress is force-saved when the app closes
+
 ## [v2.1.2]
 
 ### Added
