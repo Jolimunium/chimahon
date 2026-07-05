@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.util.fastAll
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
@@ -33,7 +34,10 @@ import eu.kanade.presentation.library.DeleteLibraryEntryDialog
 import eu.kanade.presentation.entries.anime.library.AnimeLibraryContent
 import eu.kanade.presentation.entries.anime.library.AnimeLibrarySettingsDialog
 import eu.kanade.presentation.library.components.LibraryToolbar
+import eu.kanade.presentation.library.components.LibraryToolbarTitle
 import eu.kanade.presentation.more.onboarding.GETTING_STARTED_URL
+import eu.kanade.tachiyomi.ui.library.LibraryModeTitleContent
+import eu.kanade.tachiyomi.ui.library.LibraryViewMode
 import cafe.adriel.voyager.core.screen.Screen
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
@@ -67,7 +71,11 @@ import tachiyomi.source.local.entries.anime.isLocal
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Screen.AnimeLibraryPanel(
-    titleContent: @Composable () -> Unit = {},
+    libraryMode: LibraryViewMode? = null,
+    showModeDropdown: Boolean = false,
+    onToggleDropdown: () -> Unit = {},
+    onDismissDropdown: () -> Unit = {},
+    onModeSelected: (LibraryViewMode) -> Unit = {},
     settingsEvent: Channel<Unit> = requestSettingsSheetEvent,
 ) {
     val navigator = LocalNavigator.currentOrThrow
@@ -112,7 +120,20 @@ fun Screen.AnimeLibraryPanel(
                 hasActiveFilters = state.hasActiveFilters,
                 selectedCount = state.selection.size,
                 title = title,
-                titleContent = titleContent,
+                titleContent = if (libraryMode != null) {
+                    {
+                        LibraryModeTitleContent(
+                            title = title,
+                            showModeDropdown = showModeDropdown,
+                            onToggleDropdown = onToggleDropdown,
+                            onDismissDropdown = onDismissDropdown,
+                            libraryMode = libraryMode,
+                            onModeSelected = onModeSelected,
+                        )
+                    }
+                } else {
+                    null
+                },
                 onClickUnselectAll = screenModel::clearSelection,
                 onClickSelectAll = { screenModel.selectAll(state.coercedActiveCategoryIndex) },
                 onClickInvertSelection = {
@@ -299,6 +320,10 @@ data object AnimeTab : Tab {
                 icon = rememberAnimatedVectorPainter(image, false),
             )
         }
+
+    override suspend fun onReselect(navigator: Navigator) {
+        requestAnimeSettingsSheet()
+    }
 
     @Composable
     override fun Content() {

@@ -94,7 +94,12 @@ data object MoreTab : Tab {
                 }
             },
             // SY -->
-            moreTabKeys = NavTabLayout.parse(screenModel.moreTabKeys.value).getKeysForSection(NavSection.MORE),
+            moreTabKeys = {
+                val consolidated = Injekt.get<UiPreferences>().useConsolidatedLibrary().get()
+                NavTabLayout.parse(screenModel.moreTabKeys.value)
+                    .let { if (consolidated) NavTabLayout(it.entries.filter { e -> e.key != NavTabLayout.KEY_NOVELS && e.key != NavTabLayout.KEY_ANIME }) else it }
+                    .getKeysForSection(NavSection.MORE)
+            }(),
             // SY <--
             onClickDownloadQueue = { navigator.push(DownloadQueueScreen) },
             onClickCategories = { navigator.push(CategoryScreen()) },
@@ -110,8 +115,8 @@ data object MoreTab : Tab {
             onClickLibrary = { navigator.push(eu.kanade.tachiyomi.ui.library.LibraryTab) },
             onClickBrowse = { navigator.push(eu.kanade.tachiyomi.ui.browse.BrowseTab) },
             onClickDictionary = { navigator.push(eu.kanade.tachiyomi.ui.dictionary.DictionaryTab) },
-            onClickNovels = { navigator.push(eu.kanade.tachiyomi.ui.library.LibraryTab) },
-            onClickAnime = { navigator.push(eu.kanade.tachiyomi.ui.library.LibraryTab) },
+            onClickNovels = { navigator.push(eu.kanade.tachiyomi.ui.library.novels.NovelsTab) },
+            onClickAnime = { navigator.push(eu.kanade.tachiyomi.ui.entries.anime.AnimeTab) },
             // SY <--
             // KMK -->
             onClickLibraryUpdateErrors = { navigator.push(LibraryUpdateErrorScreen()) },

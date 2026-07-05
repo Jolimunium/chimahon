@@ -234,7 +234,16 @@ fun MoreScreen(
                             icon = Icons.Outlined.Search,
                             onPreferenceClick = onClickDictionary,
                         )
-
+                        NavTabLayout.KEY_NOVELS -> TextPreferenceWidget(
+                            title = stringResource(MR.strings.label_novels),
+                            icon = Icons.Outlined.Book,
+                            onPreferenceClick = onClickNovels,
+                        )
+                        NavTabLayout.KEY_ANIME -> TextPreferenceWidget(
+                            title = stringResource(MR.strings.label_anime),
+                            icon = Icons.Outlined.VideoLibrary,
+                            onPreferenceClick = onClickAnime,
+                        )
                     }
                 }
             }
