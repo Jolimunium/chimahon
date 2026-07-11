@@ -668,6 +668,10 @@ class MainActivity : BaseActivity() {
                 navigator.popUntilRoot()
                 HomeScreen.Tab.More(toDownloads = true)
             }
+            Constants.SHORTCUT_STATS -> {
+                navigator.popUntilRoot()
+                HomeScreen.Tab.More(toDownloads = false, toStats = true)
+            }
             Constants.SHORTCUT_ANIME -> {
                 navigator.popUntilRoot()
                 if (Injekt.get<UiPreferences>().useConsolidatedLibrary().get()) {
@@ -675,6 +679,14 @@ class MainActivity : BaseActivity() {
                 } else {
                     HomeScreen.Tab.Anime
                 }
+            }
+            Constants.SHORTCUT_DICTIONARY -> {
+                navigator.popUntilRoot()
+                HomeScreen.Tab.Dictionary
+            }
+            Constants.SHORTCUT_NOVELS -> {
+                navigator.popUntilRoot()
+                HomeScreen.Tab.Novels
             }
             // KMK -->
             Constants.SHORTCUT_LIBRARY_UPDATE_ERRORS -> {

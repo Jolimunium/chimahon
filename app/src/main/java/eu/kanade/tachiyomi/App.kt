@@ -228,8 +228,8 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         MangaCoverMetadata.load()
         // KMK <--
 
-        // Updates widget update
         WidgetManager(Injekt.get(), Injekt.get()).apply { init(scope) }
+        eu.kanade.tachiyomi.glance.ChimahonWidgetManager.start(this)
 
         if (!WorkManager.isInitialized()) {
             WorkManager.initialize(this, Configuration.Builder().build())
@@ -334,6 +334,8 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         // AM (DISCORD) -->
         DiscordRPCService.stop(applicationContext)
         // <-- AM (DISCORD)
+        
+        eu.kanade.tachiyomi.glance.ChimahonWidgetManager.updateAllWidgets(this)
     }
 
     override fun getPackageName(): String {
