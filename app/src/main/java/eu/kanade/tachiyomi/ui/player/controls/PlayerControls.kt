@@ -155,6 +155,7 @@ fun PlayerControls(
     val chapters by viewModel.chapters.collectAsState()
     val currentBrightness by viewModel.currentBrightness.collectAsState()
     val currentSubtitleText by viewModel.currentSubtitleText.collectAsState()
+    val subtitlesVisible by viewModel.subtitlesVisible.collectAsState()
     val subtitleCues by viewModel.subtitleHistory.collectAsState()
     val activeSubtitleCueIndex by viewModel.activeSubtitleCueIndex.collectAsState()
     val primarySubtitleDelaySeconds by viewModel.primarySubtitleDelaySeconds.collectAsState()
@@ -252,7 +253,7 @@ fun PlayerControls(
             })
         }
         PlayerSubtitleTextLayer(
-            text = currentSubtitleText,
+            text = if (subtitlesVisible) currentSubtitleText else "",
             cue = activeSubtitleCue,
             subtitleDelaySeconds = primarySubtitleDelaySeconds,
             request = subtitleLookupRequest,
