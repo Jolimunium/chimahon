@@ -412,7 +412,7 @@ class OcrSubsamplingImageView(
 
         // Binary search for maximizing font size, similar to userscript's findBestFit
         var low = 8f * density
-        var high = sH * 2.0f // Allow more headroom for short text in wide boxes
+        var high = sH * 2.0f * getParentScaleCompensation() // Allow more headroom for short text in wide boxes
         var bestSize = low
 
         // Approx 10 iterations for precision
@@ -420,9 +420,10 @@ class OcrSubsamplingImageView(
             val mid = (low + high) / 2f
             textPaint.textSize = mid
             val width = textPaint.measureText(text)
+            val fm = textPaint.fontMetrics
+            val charHeight = fm.descent - fm.ascent
 
-            // Matching reference findBestFit: horizontal search is width-based only
-            if (width <= sW * 1.05f) {
+            if (width <= sW * 1.05f && charHeight <= sH * 1.05f) {
                 bestSize = mid
                 low = mid + 0.1f
             } else {
@@ -474,7 +475,7 @@ class OcrSubsamplingImageView(
 
         // Binary search for maximizing vertical font size
         var low = 8f * density
-        var high = minOf(sW, rowStep) * 2.0f
+        var high = minOf(sW, rowStep) * 2.0f * getParentScaleCompensation()
         var bestSize = low
 
         repeat(10) {
@@ -626,7 +627,7 @@ class OcrSubsamplingImageView(
         }
 
         val lineCount = block.lines.size.coerceAtLeast(1)
-        var textSize = screenH / lineCount / 1.2f // slight padding
+        var textSize = screenH / lineCount / 1.2f * getParentScaleCompensation() // slight padding
 
         // Build layout with shrink-to-fit loop
         var layout: StaticLayout
