@@ -8,7 +8,6 @@ import android.os.Environment
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -17,32 +16,29 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.DragHandle
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.CloudDownload
-import androidx.compose.material.icons.outlined.Sync
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.ImportExport
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -55,6 +51,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -80,14 +77,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import chimahon.HoshiDicts
-import chimahon.dictionary.readDictionaryIndex
-import com.canopus.chimareader.data.FontManager
-import com.hippo.unifile.UniFile
 import chimahon.anki.AnkiCardCreator
 import chimahon.anki.AnkiDroidBridge
 import chimahon.anki.AnkiProfile
 import chimahon.anki.LapisPreset
 import chimahon.anki.Marker
+import chimahon.dictionary.readDictionaryIndex
+import com.canopus.chimareader.data.FontManager
+import com.hippo.unifile.UniFile
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.tachiyomi.data.dictionary.DictionaryUpdateJob
 import eu.kanade.tachiyomi.ui.dictionary.DictionaryPreferences
@@ -95,6 +92,7 @@ import eu.kanade.tachiyomi.ui.dictionary.getDictionaryTitle
 import eu.kanade.tachiyomi.ui.dictionary.invalidateDictionaryTitle
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -105,8 +103,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -120,6 +116,9 @@ import tachiyomi.presentation.core.util.collectAsState
 import eu.kanade.tachiyomi.data.ocr.ModelDownloader
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import eu.kanade.presentation.more.settings.widget.EditTextPreferenceWidget
+import eu.kanade.presentation.more.settings.widget.PreferenceGroupHeader
+import eu.kanade.presentation.more.settings.widget.SwitchPreferenceWidget
 import eu.kanade.presentation.more.settings.widget.TextPreferenceWidget
 import eu.kanade.presentation.more.settings.screen.appearance.AppCustomThemeColorPickerScreen
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -291,7 +290,7 @@ object SettingsDictionaryScreen : SearchableSettings {
 
     @ReadOnlyComposable
     @Composable
-    override fun getTitleRes() = MR.strings.pref_category_dictionary
+    override fun getTitleRes() = KMR.strings.pref_category_dictionaries_and_audio
 
     @Composable
     override fun getPreferences(): List<Preference> {
@@ -299,10 +298,6 @@ object SettingsDictionaryScreen : SearchableSettings {
         val scope = rememberCoroutineScope()
         val dictionaryPreferences = remember { Injekt.get<DictionaryPreferences>() }
         var errorDialogText by remember { mutableStateOf<String?>(null) }
-
-        // Trigger recomposition when profile state changes
-        val rawProfiles by dictionaryPreferences.rawProfiles().collectAsState()
-        val rawActiveProfileId by dictionaryPreferences.rawActiveProfileId().collectAsState()
 
         LaunchedEffect(Unit) {
             loadDictionaryList(context)
@@ -459,17 +454,85 @@ object SettingsDictionaryScreen : SearchableSettings {
             )
         }
 
+        // Dictionary tab: profiles + imported dicts + updates + word audio
         return listOf(
-            getAppearanceGroup(),
             getAnkiProfileGroup(),
             getDictionaryListGroup(importLauncher),
+            getDictionaryUpdatesGroup(),
             getWordAudioGroup(pickDb),
-            getAnkiGroup(),
         )
     }
 
     @Composable
-    private fun getAppearanceGroup(): Preference.PreferenceGroup {
+    private fun getDictionaryUpdatesGroup(): Preference.PreferenceGroup {
+        val context = LocalContext.current
+        val dictionaryPreferences = remember { Injekt.get<DictionaryPreferences>() }
+        val autoUpdateEnabled by dictionaryPreferences.autoUpdateEnabled().collectAsState()
+        val autoUpdateInterval by dictionaryPreferences.autoUpdateInterval().collectAsState()
+        val lastCheckMs by dictionaryPreferences.lastDictUpdateCheck().collectAsState()
+
+        // 0 = disabled; otherwise hours (same keys as before for backup/upgrade safety)
+        val intervalEntries = persistentListOf(
+            0 to stringResource(MR.strings.update_never),
+            1 to stringResource(MR.strings.update_1hour),
+            6 to stringResource(MR.strings.update_6hour),
+            12 to stringResource(MR.strings.update_12hour),
+            24 to stringResource(MR.strings.update_24hour),
+            48 to stringResource(MR.strings.update_48hour),
+            72 to stringResource(MR.strings.update_72hour),
+            168 to stringResource(MR.strings.update_weekly),
+        ).associate { it.first.toString() to it.second }.toPersistentMap()
+
+        val currentKey = if (autoUpdateEnabled) autoUpdateInterval.toString() else "0"
+        val lastCheckedSubtitle = if (lastCheckMs > 0L) {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+            "Last checked: ${sdf.format(java.util.Date(lastCheckMs))}"
+        } else {
+            "Not checked yet"
+        }
+
+        return Preference.PreferenceGroup(
+            title = "Updates",
+            preferenceItems = persistentListOf(
+                Preference.PreferenceItem.BasicListPreference(
+                    value = currentKey,
+                    entries = intervalEntries,
+                    title = "Auto-update dictionaries",
+                    subtitle = "%s",
+                    onValueChanged = { key ->
+                        val hours = key.toIntOrNull() ?: 0
+                        if (hours <= 0) {
+                            dictionaryPreferences.autoUpdateEnabled().set(false)
+                            DictionaryUpdateJob.setupTask(context, false)
+                        } else {
+                            dictionaryPreferences.autoUpdateEnabled().set(true)
+                            dictionaryPreferences.autoUpdateInterval().set(hours)
+                            DictionaryUpdateJob.setupTask(context, true, hours)
+                        }
+                    },
+                ),
+                Preference.PreferenceItem.TextPreference(
+                    title = stringResource(MR.strings.check_for_updates),
+                    subtitle = lastCheckedSubtitle,
+                    onClick = { DictionaryUpdateJob.checkNow(context) },
+                ),
+            ),
+        )
+    }
+
+    /** Shared by [SettingsDictionaryPopupScreen] — global popup chrome prefs. */
+    @Composable
+    fun popupPreferences(): List<Preference> = getAppearanceGroups()
+
+    /** Shared by [SettingsAnkiScreen] — profiles + Anki mining prefs (per-profile). */
+    @Composable
+    fun ankiPreferences(): List<Preference> = listOf(
+        getAnkiProfileGroup(),
+        getAnkiGroup(),
+    )
+
+    @Composable
+    private fun getAppearanceGroups(): List<Preference> {
         val dictionaryPreferences = Injekt.get<DictionaryPreferences>()
 
         val widthPref = dictionaryPreferences.popupWidth()
@@ -480,6 +543,7 @@ object SettingsDictionaryScreen : SearchableSettings {
 
         val popupSwipeThresholdPref = dictionaryPreferences.popupSwipeThreshold()
         val popupSwipeThreshold by popupSwipeThresholdPref.collectAsState()
+        val popupSwipeToDismiss by dictionaryPreferences.popupSwipeToDismiss().collectAsState()
 
         val fontSizePref = dictionaryPreferences.fontSize()
         val fontSize by fontSizePref.collectAsState()
@@ -496,358 +560,231 @@ object SettingsDictionaryScreen : SearchableSettings {
         val videoOcrAudioPaddingPref = dictionaryPreferences.videoOcrSentenceAudioPaddingSeconds()
         val videoOcrAudioPadding by videoOcrAudioPaddingPref.collectAsState()
 
+        val navigator = LocalNavigator.currentOrThrow
+        val customCssPref = dictionaryPreferences.customCss()
+
         val themeModePref = dictionaryPreferences.themeMode()
         val themeMode by themeModePref.collectAsState()
 
-        val navigator = LocalNavigator.currentOrThrow
+        // Keep multi-select set prefs aligned with the boolean flags used by the popup.
+        val frequencyModesPref = dictionaryPreferences.frequencyDisplayModes()
+        val pitchModesPref = dictionaryPreferences.pitchDisplayModes()
+        LaunchedEffect(Unit) {
+            frequencyModesPref.set(
+                buildSet {
+                    if (dictionaryPreferences.showFrequencyHarmonic().get()) add(DictionaryPreferences.FREQ_HARMONIC)
+                    if (dictionaryPreferences.showFrequencyAverage().get()) add(DictionaryPreferences.FREQ_AVERAGE)
+                },
+            )
+            pitchModesPref.set(
+                buildSet {
+                    if (dictionaryPreferences.showPitchDiagram().get()) add(DictionaryPreferences.PITCH_DIAGRAM)
+                    if (dictionaryPreferences.showPitchNumber().get()) add(DictionaryPreferences.PITCH_NUMBER)
+                    if (dictionaryPreferences.showPitchText().get()) add(DictionaryPreferences.PITCH_TEXT)
+                },
+            )
+        }
 
-        val showFreqHarmonicPref = dictionaryPreferences.showFrequencyHarmonic()
-        val showFreqHarmonic by showFreqHarmonicPref.collectAsState()
+        @Suppress("UNCHECKED_CAST")
+        val layoutItems = buildList<Preference.PreferenceItem<*, *>> {
+            add(
+                Preference.PreferenceItem.SliderPreference(
+                    value = width,
+                    title = stringResource(MR.strings.pref_dict_popup_width),
+                    subtitle = "${width}px",
+                    valueRange = 200..1920 step 10,
+                    steps = 171,
+                    onValueChanged = { widthPref.set(it) },
+                ),
+            )
+            add(
+                Preference.PreferenceItem.SliderPreference(
+                    value = height,
+                    title = stringResource(MR.strings.pref_dict_popup_height),
+                    subtitle = "${height}px",
+                    valueRange = 100..1080 step 10,
+                    steps = 97,
+                    onValueChanged = { heightPref.set(it) },
+                ),
+            )
+            add(
+                Preference.PreferenceItem.ListPreference(
+                    preference = dictionaryPreferences.popupMode(),
+                    entries = persistentListOf(
+                        "floating" to "Floating",
+                        "full_width" to "Full-width",
+                        "full_height" to "Full-height",
+                    ).associate { it.first to it.second }.toPersistentMap(),
+                    title = "Popup mode",
+                ),
+            )
+            add(
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = dictionaryPreferences.popupSwipeToDismiss(),
+                    title = stringResource(MR.strings.pref_dict_popup_swipe_to_dismiss),
+                ),
+            )
+            if (popupSwipeToDismiss) {
+                add(
+                    Preference.PreferenceItem.SliderPreference(
+                        value = popupSwipeThreshold,
+                        title = stringResource(MR.strings.pref_dict_popup_swipe_threshold),
+                        subtitle = "${popupSwipeThreshold}dp",
+                        valueRange = 20..100,
+                        steps = 79,
+                        onValueChanged = { popupSwipeThresholdPref.set(it) },
+                    ),
+                )
+            }
+        }.toPersistentList() as kotlinx.collections.immutable.ImmutableList<Preference.PreferenceItem<out Any, out Any>>
 
-        val showFreqAveragePref = dictionaryPreferences.showFrequencyAverage()
-        val showFreqAverage by showFreqAveragePref.collectAsState()
-
-        val groupTermsPref = dictionaryPreferences.groupTerms()
-        val groupTerms by groupTermsPref.collectAsState()
-
-        val customCssPref = dictionaryPreferences.customCss()
-
-        return Preference.PreferenceGroup(
-            title = stringResource(MR.strings.pref_dict_appearance),
-            preferenceItems = persistentListOf(
-                Preference.PreferenceItem.CustomPreference(
-                    title = stringResource(MR.strings.pref_dict_popup_size),
-                    content = {
-                        var selectedAxis by remember { mutableStateOf(PopupSizeAxis.WIDTH) }
-                        val selectedValue = when (selectedAxis) {
-                            PopupSizeAxis.WIDTH -> width
-                            PopupSizeAxis.HEIGHT -> height
-                        }
-                        val setSelectedValue: (Int) -> Unit = { value ->
-                            when (selectedAxis) {
-                                PopupSizeAxis.WIDTH -> widthPref.set(value)
-                                PopupSizeAxis.HEIGHT -> heightPref.set(value)
+        return listOf(
+            Preference.PreferenceGroup(
+                title = stringResource(KMR.strings.pref_dict_layout),
+                preferenceItems = layoutItems,
+            ),
+            Preference.PreferenceGroup(
+                title = stringResource(KMR.strings.pref_dict_typography),
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.CustomPreference(
+                        title = "Font Family",
+                        content = {
+                            val context = LocalContext.current
+                            val scope = rememberCoroutineScope()
+                            var importedFonts by remember { mutableStateOf(FontManager.getImportedFonts(context)) }
+                            val allFonts = remember(importedFonts) { FontManager.defaultFonts + importedFonts }
+                            val fontFamilyPref = dictionaryPreferences.fontFamily()
+                            val selectedFont by fontFamilyPref.collectAsState()
+                            var isImporting by remember { mutableStateOf(false) }
+                            val fontPickerLauncher = rememberLauncherForActivityResult(
+                                contract = ActivityResultContracts.OpenDocument(),
+                            ) { uri: Uri? ->
+                                uri?.let {
+                                    isImporting = true
+                                    scope.launch {
+                                        val success = FontManager.importFont(context, it)
+                                        if (success) {
+                                            importedFonts = FontManager.getImportedFonts(context)
+                                        }
+                                        isImporting = false
+                                    }
+                                }
                             }
-                        }
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Text(
-                                    text = stringResource(MR.strings.pref_dict_popup_size),
+                                    text = "Font Family",
                                     style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.weight(1f),
                                 )
-                                IconButton(
-                                    onClick = {
-                                        widthPref.set(300)
-                                        heightPref.set(360)
-                                    },
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Refresh,
-                                        contentDescription = "Reset popup size",
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "W ${width}px  H ${height}px",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            SingleChoiceSegmentedButtonRow(
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                PopupSizeAxis.entries.forEachIndexed { index, axis ->
-                                    SegmentedButton(
-                                        selected = selectedAxis == axis,
-                                        onClick = { selectedAxis = axis },
-                                        shape = SegmentedButtonDefaults.itemShape(index, PopupSizeAxis.entries.size),
-                                    ) {
-                                        Text(axis.label)
-                                    }
-                                }
-                            }
-                            Slider(
-                                value = selectedValue.toFloat(),
-                                onValueChange = { setSelectedValue(it.roundToInt()) },
-                                valueRange = (if (selectedAxis == PopupSizeAxis.WIDTH) 200f else 100f)..(if (selectedAxis == PopupSizeAxis.WIDTH) 1920f else 1080f),
-                                steps = (if (selectedAxis == PopupSizeAxis.WIDTH) 171 else 97),
-                            )
-                        }
-                    },
-                ),
-                Preference.PreferenceItem.CustomPreference(
-                    title = "Font Family",
-                    content = {
-                        val context = LocalContext.current
-                        val scope = rememberCoroutineScope()
-                        var importedFonts by remember { mutableStateOf(FontManager.getImportedFonts(context)) }
-                        val allFonts = remember(importedFonts) { FontManager.defaultFonts + importedFonts }
-
-                        val fontFamilyPref = dictionaryPreferences.fontFamily()
-                        val selectedFont by fontFamilyPref.collectAsState()
-
-                        var isImporting by remember { mutableStateOf(false) }
-                        val fontPickerLauncher = rememberLauncherForActivityResult(
-                            contract = ActivityResultContracts.OpenDocument()
-                        ) { uri: Uri? ->
-                            uri?.let {
-                                isImporting = true
-                                scope.launch {
-                                    val success = FontManager.importFont(context, it)
-                                    if (success) {
-                                        importedFonts = FontManager.getImportedFonts(context)
-                                    }
-                                    isImporting = false
-                                }
-                            }
-                        }
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "Font Family",
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-
-                            var fontExpanded by remember { mutableStateOf(false) }
-                            ExposedDropdownMenuBox(
-                                expanded = fontExpanded,
-                                onExpandedChange = { fontExpanded = it }
-                            ) {
-                                OutlinedTextField(
-                                    value = selectedFont.takeIf { it.isNotBlank() } ?: "Default",
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = fontExpanded) },
-                                    modifier = Modifier.menuAnchor().fillMaxWidth()
-                                )
-                                ExposedDropdownMenu(
+                                var fontExpanded by remember { mutableStateOf(false) }
+                                ExposedDropdownMenuBox(
                                     expanded = fontExpanded,
-                                    onDismissRequest = { fontExpanded = false }
+                                    onExpandedChange = { fontExpanded = it },
                                 ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Default") },
-                                        onClick = {
-                                            fontFamilyPref.set("")
-                                            fontExpanded = false
-                                        }
+                                    OutlinedTextField(
+                                        value = selectedFont.takeIf { it.isNotBlank() } ?: "Default",
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        trailingIcon = {
+                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = fontExpanded)
+                                        },
+                                        modifier = Modifier.menuAnchor().fillMaxWidth(),
                                     )
-                                    allFonts.forEach { font ->
+                                    ExposedDropdownMenu(
+                                        expanded = fontExpanded,
+                                        onDismissRequest = { fontExpanded = false },
+                                    ) {
                                         DropdownMenuItem(
-                                            text = { Text(font) },
+                                            text = { Text("Default") },
                                             onClick = {
-                                                fontFamilyPref.set(font)
+                                                fontFamilyPref.set("")
                                                 fontExpanded = false
-                                            }
+                                            },
                                         )
-                                    }
-                                }
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        fontPickerLauncher.launch(
-                                            arrayOf(
-                                                "application/font-ttf",
-                                                "application/x-font-ttf",
-                                                "font/ttf",
-                                                "application/x-font-otf",
-                                                "font/otf",
-                                                "application/octet-stream"
+                                        allFonts.forEach { font ->
+                                            DropdownMenuItem(
+                                                text = { Text(font) },
+                                                onClick = {
+                                                    fontFamilyPref.set(font)
+                                                    fontExpanded = false
+                                                },
                                             )
-                                        )
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    enabled = !isImporting
-                                ) {
-                                    if (isImporting) {
-                                        androidx.compose.material3.CircularProgressIndicator(
-                                            modifier = Modifier.size(16.dp),
-                                            strokeWidth = 2.dp
-                                        )
-                                    } else {
-                                        Text("Import Font")
+                                        }
                                     }
                                 }
-
-                                if (importedFonts.contains(selectedFont)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
                                     OutlinedButton(
                                         onClick = {
-                                            FontManager.deleteFont(context, selectedFont)
-                                            importedFonts = FontManager.getImportedFonts(context)
-                                            fontFamilyPref.set("")
+                                            fontPickerLauncher.launch(
+                                                arrayOf(
+                                                    "application/font-ttf",
+                                                    "application/x-font-ttf",
+                                                    "font/ttf",
+                                                    "application/x-font-otf",
+                                                    "font/otf",
+                                                    "application/octet-stream",
+                                                ),
+                                            )
                                         },
                                         modifier = Modifier.weight(1f),
-                                        colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-                                            contentColor = MaterialTheme.colorScheme.error
-                                        )
+                                        enabled = !isImporting,
                                     ) {
-                                        Text("Delete Font")
+                                        if (isImporting) {
+                                            androidx.compose.material3.CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp,
+                                            )
+                                        } else {
+                                            Text("Import Font")
+                                        }
+                                    }
+                                    if (importedFonts.contains(selectedFont)) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                FontManager.deleteFont(context, selectedFont)
+                                                importedFonts = FontManager.getImportedFonts(context)
+                                                fontFamilyPref.set("")
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                                                contentColor = MaterialTheme.colorScheme.error,
+                                            ),
+                                        ) {
+                                            Text("Delete Font")
+                                        }
                                     }
                                 }
                             }
-                        }
-                    }
-                ),
-                Preference.PreferenceItem.SliderPreference(
-                    value = fontSize,
-                    title = stringResource(MR.strings.pref_dict_popup_font_size),
-                    subtitle = "${fontSize}px",
-                    valueRange = 8..48,
-                    steps = 40,
-                    onValueChanged = { newValue ->
-                        fontSizePref.set(newValue)
-                    },
-                ),
-                Preference.PreferenceItem.CustomPreference(
-                    title = stringResource(MR.strings.pref_dict_ocr_box_scale),
-                    content = {
-                        var selectedAxis by remember { mutableStateOf(OcrScaleAxis.X) }
-                        val selectedValue = when (selectedAxis) {
-                            OcrScaleAxis.X -> ocrBoxScaleX
-                            OcrScaleAxis.Y -> ocrBoxScaleY
-                        }
-                        val setSelectedValue: (Float) -> Unit = { value ->
-                            val rounded = ((value * 10f).roundToInt() / 10f).coerceIn(0.5f, 3.0f)
-                            when (selectedAxis) {
-                                OcrScaleAxis.X -> ocrBoxScaleXPref.set(rounded)
-                                OcrScaleAxis.Y -> ocrBoxScaleYPref.set(rounded)
-                            }
-                        }
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = stringResource(MR.strings.pref_dict_ocr_box_scale),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                IconButton(
-                                    onClick = {
-                                        ocrBoxScaleXPref.set(1.0f)
-                                        ocrBoxScaleYPref.set(1.0f)
-                                    },
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Refresh,
-                                        contentDescription = "Reset OCR box scale",
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "X ${String.format("%.1fx", ocrBoxScaleX)}  Y ${String.format("%.1fx", ocrBoxScaleY)}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            SingleChoiceSegmentedButtonRow(
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                OcrScaleAxis.entries.forEachIndexed { index, axis ->
-                                    SegmentedButton(
-                                        selected = selectedAxis == axis,
-                                        onClick = { selectedAxis = axis },
-                                        shape = SegmentedButtonDefaults.itemShape(index, OcrScaleAxis.entries.size),
-                                    ) {
-                                        Text(axis.label)
-                                    }
-                                }
-                            }
-                            Slider(
-                                value = selectedValue.coerceIn(0.5f, 3.0f),
-                                onValueChange = setSelectedValue,
-                                valueRange = 0.5f..3.0f,
-                                steps = 24,
-                            )
-                        }
-                    },
-                ),
-                Preference.PreferenceItem.SliderPreference(
-                    value = (ocrBoxOpacity * 100).toInt(),
-                    title = stringResource(MR.strings.pref_dict_ocr_box_opacity),
-                    subtitle = "${(ocrBoxOpacity * 100).toInt()}%",
-                    valueRange = 0..100 step 5,
-                    steps = 19,
-                    onValueChanged = { newValue ->
-                        ocrBoxOpacityPref.set(newValue / 100f)
-                    },
-                ),
-                Preference.PreferenceItem.ListPreference(
-                    preference = dictionaryPreferences.ocrEngine(),
-                    entries = persistentListOf(
-                        "cloud" to "Cloud (Google Lens)",
-                        *if (eu.kanade.tachiyomi.BuildConfig.HAS_LOCAL_OCR) {
-                            arrayOf("local" to "Local (On-Device)")
-                        } else {
-                            emptyArray()
                         },
-                    ).associate { it.first to it.second }.toPersistentMap(),
-                    title = "OCR Engine",
-                    onValueChanged = { value ->
-                        if (value == "local") {
-                            Injekt.get<ModelDownloader>().triggerDownload()
-                        }
-                        true
-                    },
+                    ),
+                    Preference.PreferenceItem.SliderPreference(
+                        value = fontSize,
+                        title = stringResource(MR.strings.pref_dict_popup_font_size),
+                        subtitle = "${fontSize}px",
+                        valueRange = 8..48,
+                        steps = 40,
+                        onValueChanged = { fontSizePref.set(it) },
+                    ),
                 ),
-                Preference.PreferenceItem.SliderPreference(
-                    value = videoOcrAudioPadding,
-                    title = "Video OCR sentence audio padding",
-                    subtitle = "${videoOcrAudioPadding}s before and after the current video time",
-                    valueRange = 1..15,
-                    steps = 13,
-                    onValueChanged = { newValue ->
-                        videoOcrAudioPaddingPref.set(newValue)
-                    },
-                ),
-                Preference.PreferenceItem.TextPreference(
-                    title = stringResource(KMR.strings.pref_custom_color),
-                    subtitle = stringResource(KMR.strings.custom_color_description),
-                    enabled = true,
-                    onClick = {
-                        navigator.push(AppCustomThemeColorPickerScreen(isDictionary = true))
-                    },
-                ),
-                Preference.PreferenceItem.CustomPreference(
-                    title = "Dictionary theme",
-                    content = {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                        ) {
-                            Text(
-                                text = "Dictionary theme",
-                                style = MaterialTheme.typography.titleMedium,
-                            )
+            ),
+            Preference.PreferenceGroup(
+                title = stringResource(MR.strings.pref_category_theme),
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.CustomPreference(
+                        title = "theme_chips",
+                        content = {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 8.dp),
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 val chips = listOf(
@@ -864,202 +801,256 @@ object SettingsDictionaryScreen : SearchableSettings {
                                     )
                                 }
                             }
-                        }
-                    },
-                ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = dictionaryPreferences.eInkMode(),
-                    title = "E-Ink mode",
-                    subtitle = "Removes animations, shadows, and rounded corners for better readability on e-ink displays",
-                ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = dictionaryPreferences.paginatedScrolling(),
-                    title = "Paginated scrolling",
-                    subtitle = "Scroll by page-sized steps instead of smooth scrolling",
-                ),
-                Preference.PreferenceItem.CustomPreference(
-                    title = stringResource(MR.strings.pref_dict_frequency_display),
-                    content = {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Text(
-                                text = stringResource(MR.strings.pref_dict_frequency_display),
-                                style = MaterialTheme.typography.titleMedium,
+                        },
+                    ),
+                    Preference.PreferenceItem.TextPreference(
+                        title = stringResource(KMR.strings.pref_custom_color),
+                        subtitle = stringResource(KMR.strings.custom_color_description),
+                        onClick = {
+                            navigator.push(AppCustomThemeColorPickerScreen(isDictionary = true))
+                        },
+                    ),
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = dictionaryPreferences.eInkMode(),
+                        title = "E-Ink mode",
+                        subtitle = "Removes animations, shadows, and rounded corners for better readability on e-ink displays",
+                    ),
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = dictionaryPreferences.paginatedScrolling(),
+                        title = "Paginated scrolling",
+                        subtitle = "Scroll by page-sized steps instead of smooth scrolling",
+                    ),
+                    Preference.PreferenceItem.CustomPreference(
+                        title = stringResource(MR.strings.pref_dict_custom_css),
+                        content = {
+                            var isDialogShown by remember { mutableStateOf(false) }
+                            val css by customCssPref.collectAsState()
+                            TextPreferenceWidget(
+                                title = stringResource(MR.strings.pref_dict_custom_css),
+                                subtitle = stringResource(MR.strings.pref_dict_custom_css_summary),
+                                onPreferenceClick = { isDialogShown = true },
                             )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                FilterChip(
-                                    selected = showFreqHarmonic,
-                                    onClick = { showFreqHarmonicPref.set(!showFreqHarmonic) },
-                                    label = { Text("Harmonic rank") },
-                                    modifier = Modifier.weight(1f),
-                                )
-                                FilterChip(
-                                    selected = showFreqAverage,
-                                    onClick = { showFreqAveragePref.set(!showFreqAverage) },
-                                    label = { Text(stringResource(MR.strings.pref_dict_show_frequency_average)) },
-                                    modifier = Modifier.weight(1f),
+                            if (isDialogShown) {
+                                var text by remember { mutableStateOf(css) }
+                                AlertDialog(
+                                    onDismissRequest = { isDialogShown = false },
+                                    title = { Text(stringResource(MR.strings.pref_dict_custom_css)) },
+                                    text = {
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Text(
+                                                text = stringResource(MR.strings.pref_dict_custom_css_summary),
+                                                style = MaterialTheme.typography.bodySmall,
+                                            )
+                                            OutlinedTextField(
+                                                value = text,
+                                                onValueChange = { text = it },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(400.dp),
+                                                placeholder = { Text("Paste your CSS here...") },
+                                                singleLine = false,
+                                            )
+                                        }
+                                    },
+                                    confirmButton = {
+                                        TextButton(
+                                            onClick = {
+                                                customCssPref.set(text)
+                                                isDialogShown = false
+                                            },
+                                        ) {
+                                            Text(stringResource(MR.strings.action_ok))
+                                        }
+                                    },
+                                    dismissButton = {
+                                        TextButton(onClick = { isDialogShown = false }) {
+                                            Text(stringResource(MR.strings.action_cancel))
+                                        }
+                                    },
                                 )
                             }
-                        }
-                    },
+                        },
+                    ),
                 ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = dictionaryPreferences.groupPitches(),
-                    title = stringResource(KMR.strings.pref_dict_group_pitches),
-                    subtitle = stringResource(KMR.strings.pref_dict_group_pitches_summary),
+            ),
+            Preference.PreferenceGroup(
+                title = stringResource(KMR.strings.pref_dict_content),
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.MultiSelectListPreference(
+                        preference = frequencyModesPref,
+                        entries = persistentListOf(
+                            DictionaryPreferences.FREQ_HARMONIC to "Harmonic rank",
+                            DictionaryPreferences.FREQ_AVERAGE to
+                                stringResource(MR.strings.pref_dict_show_frequency_average),
+                        ).associate { it.first to it.second }.toPersistentMap(),
+                        title = stringResource(MR.strings.pref_dict_frequency_display),
+                        onValueChanged = { selected ->
+                            dictionaryPreferences.showFrequencyHarmonic()
+                                .set(DictionaryPreferences.FREQ_HARMONIC in selected)
+                            dictionaryPreferences.showFrequencyAverage()
+                                .set(DictionaryPreferences.FREQ_AVERAGE in selected)
+                            true
+                        },
+                    ),
+                    Preference.PreferenceItem.MultiSelectListPreference(
+                        preference = pitchModesPref,
+                        entries = persistentListOf(
+                            DictionaryPreferences.PITCH_DIAGRAM to
+                                stringResource(MR.strings.pref_dict_pitch_diagram),
+                            DictionaryPreferences.PITCH_NUMBER to
+                                stringResource(MR.strings.pref_dict_pitch_number),
+                            DictionaryPreferences.PITCH_TEXT to
+                                stringResource(MR.strings.pref_dict_pitch_text),
+                        ).associate { it.first to it.second }.toPersistentMap(),
+                        title = stringResource(MR.strings.pref_dict_pitch_accent_display),
+                        onValueChanged = { selected ->
+                            dictionaryPreferences.showPitchDiagram()
+                                .set(DictionaryPreferences.PITCH_DIAGRAM in selected)
+                            dictionaryPreferences.showPitchNumber()
+                                .set(DictionaryPreferences.PITCH_NUMBER in selected)
+                            dictionaryPreferences.showPitchText()
+                                .set(DictionaryPreferences.PITCH_TEXT in selected)
+                            true
+                        },
+                    ),
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = dictionaryPreferences.groupPitches(),
+                        title = stringResource(KMR.strings.pref_dict_group_pitches),
+                        subtitle = stringResource(KMR.strings.pref_dict_group_pitches_summary),
+                    ),
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = dictionaryPreferences.groupTerms(),
+                        title = stringResource(MR.strings.pref_dict_group_terms),
+                        subtitle = stringResource(MR.strings.pref_dict_group_terms_summary),
+                    ),
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = dictionaryPreferences.showNavigationButtons(),
+                        title = stringResource(KMR.strings.pref_dict_show_navigation_buttons),
+                        subtitle = stringResource(KMR.strings.pref_dict_show_navigation_buttons_summary),
+                    ),
+                    Preference.PreferenceItem.ListPreference(
+                        preference = dictionaryPreferences.recursiveLookupMode(),
+                        entries = persistentListOf(
+                            "tabs" to stringResource(MR.strings.pref_dict_recursive_mode_tabs),
+                            "stack" to stringResource(MR.strings.pref_dict_recursive_mode_back),
+                            "popup" to stringResource(MR.strings.pref_dict_recursive_mode_popup),
+                        ).associate { it.first to it.second }.toPersistentMap(),
+                        title = stringResource(MR.strings.pref_dict_recursive_mode),
+                    ),
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = dictionaryPreferences.autoKanaConversion(),
+                        title = stringResource(KMR.strings.pref_dict_auto_kana_conversion),
+                        subtitle = stringResource(KMR.strings.pref_dict_auto_kana_conversion_summary),
+                    ),
                 ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = groupTermsPref,
-                    title = stringResource(MR.strings.pref_dict_group_terms),
-                    subtitle = stringResource(MR.strings.pref_dict_group_terms_summary),
-                ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = dictionaryPreferences.showNavigationButtons(),
-                    title = stringResource(KMR.strings.pref_dict_show_navigation_buttons),
-                    subtitle = stringResource(KMR.strings.pref_dict_show_navigation_buttons_summary),
-                ),
-                Preference.PreferenceItem.ListPreference(
-                    preference = dictionaryPreferences.popupMode(),
-                    entries = persistentListOf(
-                        "floating" to "Floating",
-                        "full_width" to "Full-width",
-                        "full_height" to "Full-height",
-                    ).associate { it.first to it.second }.toPersistentMap(),
-                    title = "Popup mode",
-                ),
-                Preference.PreferenceItem.CustomPreference(
-                    title = stringResource(MR.strings.pref_dict_custom_css),
-                    content = {
-                        var isDialogShown by remember { mutableStateOf(false) }
-                        val css by customCssPref.collectAsState()
-
-                        TextPreferenceWidget(
-                            title = stringResource(MR.strings.pref_dict_custom_css),
-                            subtitle = stringResource(MR.strings.pref_dict_custom_css_summary),
-                            onPreferenceClick = { isDialogShown = true },
-                        )
-
-                        if (isDialogShown) {
-                            var text by remember { mutableStateOf(css) }
-                            AlertDialog(
-                                onDismissRequest = { isDialogShown = false },
-                                title = { Text(stringResource(MR.strings.pref_dict_custom_css)) },
-                                text = {
-                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Text(
-                                            text = stringResource(MR.strings.pref_dict_custom_css_summary),
-                                            style = MaterialTheme.typography.bodySmall,
-                                        )
-                                        OutlinedTextField(
-                                            value = text,
-                                            onValueChange = { text = it },
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(400.dp),
-                                            placeholder = { Text("Paste your CSS here...") },
-                                            singleLine = false,
-                                        )
-                                    }
-                                },
-                                confirmButton = {
-                                    TextButton(
-                                        onClick = {
-                                            customCssPref.set(text)
-                                            isDialogShown = false
-                                        },
-                                    ) {
-                                        Text(stringResource(MR.strings.action_ok))
-                                    }
-                                },
-                                dismissButton = {
-                                    TextButton(onClick = { isDialogShown = false }) {
-                                        Text(stringResource(MR.strings.action_cancel))
-                                    }
-                                },
-                            )
-                        }
-                    },
-                ),
-                Preference.PreferenceItem.ListPreference(
-                    preference = dictionaryPreferences.recursiveLookupMode(),
-                    entries = persistentListOf(
-                        "tabs" to stringResource(MR.strings.pref_dict_recursive_mode_tabs),
-                        "stack" to stringResource(MR.strings.pref_dict_recursive_mode_back),
-                        "popup" to stringResource(MR.strings.pref_dict_recursive_mode_popup),
-                    ).associate { it.first to it.second }.toPersistentMap(),
-                    title = stringResource(MR.strings.pref_dict_recursive_mode),
-                ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = dictionaryPreferences.popupSwipeToDismiss(),
-                    title = stringResource(MR.strings.pref_dict_popup_swipe_to_dismiss),
-                ),
-                Preference.PreferenceItem.SliderPreference(
-                    value = popupSwipeThreshold,
-                    title = stringResource(MR.strings.pref_dict_popup_swipe_threshold),
-                    subtitle = "${popupSwipeThreshold}dp",
-                    valueRange = 20..100,
-                    steps = 79,
-                    onValueChanged = { newValue ->
-                        popupSwipeThresholdPref.set(newValue)
-                    },
-                ),
-                Preference.PreferenceItem.CustomPreference(
-                    title = stringResource(MR.strings.pref_dict_pitch_accent_display),
-                    content = {
-                        val showPitchDiagramPref = dictionaryPreferences.showPitchDiagram()
-                        val showPitchDiagram by showPitchDiagramPref.collectAsState()
-
-                        val showPitchNumberPref = dictionaryPreferences.showPitchNumber()
-                        val showPitchNumber by showPitchNumberPref.collectAsState()
-
-                        val showPitchTextPref = dictionaryPreferences.showPitchText()
-                        val showPitchText by showPitchTextPref.collectAsState()
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                        ) {
-                            Text(
-                                text = stringResource(MR.strings.pref_dict_pitch_accent_display),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Row(
+            ),
+            Preference.PreferenceGroup(
+                title = stringResource(MR.strings.pref_category_ocr),
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.CustomPreference(
+                        title = stringResource(MR.strings.pref_dict_ocr_box_scale),
+                        content = {
+                            var selectedAxis by remember { mutableStateOf(OcrScaleAxis.X) }
+                            val selectedValue = when (selectedAxis) {
+                                OcrScaleAxis.X -> ocrBoxScaleX
+                                OcrScaleAxis.Y -> ocrBoxScaleY
+                            }
+                            val setSelectedValue: (Float) -> Unit = { value ->
+                                val rounded = ((value * 10f).roundToInt() / 10f).coerceIn(0.5f, 3.0f)
+                                when (selectedAxis) {
+                                    OcrScaleAxis.X -> ocrBoxScaleXPref.set(rounded)
+                                    OcrScaleAxis.Y -> ocrBoxScaleYPref.set(rounded)
+                                }
+                            }
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                FilterChip(
-                                    selected = showPitchDiagram,
-                                    onClick = { showPitchDiagramPref.set(!showPitchDiagram) },
-                                    label = { Text(stringResource(MR.strings.pref_dict_pitch_diagram)) },
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = stringResource(MR.strings.pref_dict_ocr_box_scale),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    IconButton(
+                                        onClick = {
+                                            ocrBoxScaleXPref.set(1.0f)
+                                            ocrBoxScaleYPref.set(1.0f)
+                                        },
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Refresh,
+                                            contentDescription = "Reset OCR box scale",
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = "X ${String.format("%.1fx", ocrBoxScaleX)}  Y ${String.format("%.1fx", ocrBoxScaleY)}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                FilterChip(
-                                    selected = showPitchNumber,
-                                    onClick = { showPitchNumberPref.set(!showPitchNumber) },
-                                    label = { Text(stringResource(MR.strings.pref_dict_pitch_number)) },
-                                )
-                                FilterChip(
-                                    selected = showPitchText,
-                                    onClick = { showPitchTextPref.set(!showPitchText) },
-                                    label = { Text(stringResource(MR.strings.pref_dict_pitch_text)) },
+                                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                    OcrScaleAxis.entries.forEachIndexed { index, axis ->
+                                        SegmentedButton(
+                                            selected = selectedAxis == axis,
+                                            onClick = { selectedAxis = axis },
+                                            shape = SegmentedButtonDefaults.itemShape(
+                                                index,
+                                                OcrScaleAxis.entries.size,
+                                            ),
+                                        ) {
+                                            Text(axis.label)
+                                        }
+                                    }
+                                }
+                                Slider(
+                                    value = selectedValue.coerceIn(0.5f, 3.0f),
+                                    onValueChange = setSelectedValue,
+                                    valueRange = 0.5f..3.0f,
+                                    steps = 24,
                                 )
                             }
-                        }
-                    },
-                ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = dictionaryPreferences.autoKanaConversion(),
-                    title = stringResource(KMR.strings.pref_dict_auto_kana_conversion),
-                    subtitle = stringResource(KMR.strings.pref_dict_auto_kana_conversion_summary),
+                        },
+                    ),
+                    Preference.PreferenceItem.SliderPreference(
+                        value = (ocrBoxOpacity * 100).toInt(),
+                        title = stringResource(MR.strings.pref_dict_ocr_box_opacity),
+                        subtitle = "${(ocrBoxOpacity * 100).toInt()}%",
+                        valueRange = 0..100 step 5,
+                        steps = 19,
+                        onValueChanged = { ocrBoxOpacityPref.set(it / 100f) },
+                    ),
+                    Preference.PreferenceItem.ListPreference(
+                        preference = dictionaryPreferences.ocrEngine(),
+                        entries = persistentListOf(
+                            "cloud" to "Cloud (Google Lens)",
+                            *if (eu.kanade.tachiyomi.BuildConfig.HAS_LOCAL_OCR) {
+                                arrayOf("local" to "Local (On-Device)")
+                            } else {
+                                emptyArray()
+                            },
+                        ).associate { it.first to it.second }.toPersistentMap(),
+                        title = "OCR Engine",
+                        onValueChanged = { value ->
+                            if (value == "local") {
+                                Injekt.get<ModelDownloader>().triggerDownload()
+                            }
+                            true
+                        },
+                    ),
+                    Preference.PreferenceItem.SliderPreference(
+                        value = videoOcrAudioPadding,
+                        title = "Video OCR sentence audio padding",
+                        subtitle = "${videoOcrAudioPadding}s before and after the current video time",
+                        valueRange = 1..15,
+                        steps = 13,
+                        onValueChanged = { videoOcrAudioPaddingPref.set(it) },
+                    ),
                 ),
             ),
         )
@@ -1507,185 +1498,61 @@ object SettingsDictionaryScreen : SearchableSettings {
                                     verticalArrangement = Arrangement.spacedBy(10.dp),
                                 ) {
                                     item(key = "collapse_behavior") {
-                                    Surface(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                                        shape = RoundedCornerShape(12.dp),
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                                        Surface(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                            shape = RoundedCornerShape(12.dp),
                                         ) {
-                                            Text(
-                                                text = "Collapse behavior",
-                                                style = MaterialTheme.typography.titleSmall,
-                                            )
-                                            Text(
-                                                text = "Controls which dictionary groups open first in lookup results.",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-
-                                            var collapseMenuExpanded by remember { mutableStateOf(false) }
-                                            Box {
-                                                OutlinedButton(
-                                                    onClick = { collapseMenuExpanded = true },
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                ) {
-                                                    Text(
-                                                        text = collapseModeLabel,
-                                                        modifier = Modifier.weight(1f),
-                                                    )
-                                                    Icon(
-                                                        imageVector = Icons.Outlined.KeyboardArrowDown,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(18.dp),
-                                                    )
-                                                }
-                                                DropdownMenu(
-                                                    expanded = collapseMenuExpanded,
-                                                    onDismissRequest = { collapseMenuExpanded = false },
-                                                ) {
-                                                    collapseModeOptions.forEach { (mode, label) ->
-                                                        DropdownMenuItem(
-                                                            text = { Text(label) },
-                                                            onClick = {
-                                                                profileStore.updateProfile(
-                                                                    profileStore.getActiveProfile().copy(dictionaryCollapseMode = mode),
-                                                                )
-                                                                collapseMenuExpanded = false
-                                                            },
-                                                        )
-                                            }
-                                        }
-                                    }
-                                        val autoUpdateEnabled by dictionaryPreferences.autoUpdateEnabled().collectAsState()
-                                        val autoUpdateInterval by dictionaryPreferences.autoUpdateInterval().collectAsState()
-                                        val lastCheckMs by dictionaryPreferences.lastDictUpdateCheck().collectAsState()
-                                        val intervalOptions = listOf(
-                                            1 to "1h", 6 to "6h", 12 to "12h", 24 to "24h", 48 to "48h", 72 to "72h", 168 to "7d",
-                                        )
-                                        var intervalExpanded by remember { mutableStateOf(false) }
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = 4.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Box {
-                                                IconButton(
-                                                    onClick = {
-                                                        val newVal = !autoUpdateEnabled
-                                                        dictionaryPreferences.autoUpdateEnabled().set(newVal)
-                                                        if (newVal) {
-                                                            DictionaryUpdateJob.setupTask(context, true, autoUpdateInterval)
-                                                        } else {
-                                                            DictionaryUpdateJob.setupTask(context, false)
-                                                        }
-                                                    },
-                                                    modifier = Modifier.size(28.dp),
-                                                ) {
-                                                    Box {
-                                                        Icon(
-                                                            imageVector = Icons.Outlined.Sync,
-                                                            contentDescription = if (autoUpdateEnabled) "Disable auto-update" else "Enable auto-update",
-                                                            tint = if (autoUpdateEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                            modifier = Modifier.size(18.dp),
-                                                        )
-                                                        if (!autoUpdateEnabled) {
-                                                            Canvas(modifier = Modifier.matchParentSize()) {
-                                                                val p = androidx.compose.ui.graphics.Path().apply {
-                                                                    moveTo(0f, 0f)
-                                                                    lineTo(size.width, size.height)
-                                                                }
-                                                                drawPath(
-                                                                    p,
-                                                                    color = androidx.compose.ui.graphics.Color.Red.copy(alpha = 0.7f),
-                                                                    style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                                                        width = 2.5f,
-                                                                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
-                                                                            floatArrayOf(6f, 4f), 0f,
-                                                                        ),
-                                                                    ),
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            Spacer(Modifier.width(4.dp))
-                                            Text(
-                                                text = if (autoUpdateEnabled) "ON" else "OFF",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                                color = if (autoUpdateEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                                            )
-                                            Spacer(Modifier.width(8.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
+                                            Column(
+                                                modifier = Modifier.padding(12.dp),
+                                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                            ) {
                                                 Text(
-                                                    text = "Auto-update",
+                                                    text = "Collapse behavior",
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                )
+                                                Text(
+                                                    text = "Controls which dictionary groups open first in lookup results.",
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
-                                                if (lastCheckMs > 0L) {
-                                                    val sdf = remember { java.text.SimpleDateFormat("MM/dd HH:mm", java.util.Locale.getDefault()) }
-                                                    Text(
-                                                        text = "Last: ${sdf.format(java.util.Date(lastCheckMs))}",
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                                    )
-                                                }
-                                            }
-                                            Box {
-                                                OutlinedButton(
-                                                    onClick = { intervalExpanded = true },
-                                                    modifier = Modifier.height(28.dp),
-                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                                ) {
-                                                    Text(
-                                                        text = intervalOptions.find { it.first == autoUpdateInterval }?.second ?: "24h",
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                    )
-                                                    Icon(
-                                                        imageVector = Icons.Outlined.KeyboardArrowDown,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(14.dp),
-                                                    )
-                                                }
-                                                DropdownMenu(
-                                                    expanded = intervalExpanded,
-                                                    onDismissRequest = { intervalExpanded = false },
-                                                ) {
-                                                    intervalOptions.forEach { (hours, label) ->
-                                                        DropdownMenuItem(
-                                                            text = { Text(label) },
-                                                            onClick = {
-                                                                dictionaryPreferences.autoUpdateInterval().set(hours)
-                                                                if (autoUpdateEnabled) {
-                                                                    DictionaryUpdateJob.setupTask(context, true, hours)
-                                                                }
-                                                                intervalExpanded = false
-                                                            },
+
+                                                var collapseMenuExpanded by remember { mutableStateOf(false) }
+                                                Box {
+                                                    OutlinedButton(
+                                                        onClick = { collapseMenuExpanded = true },
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                    ) {
+                                                        Text(
+                                                            text = collapseModeLabel,
+                                                            modifier = Modifier.weight(1f),
                                                         )
+                                                        Icon(
+                                                            imageVector = Icons.Outlined.KeyboardArrowDown,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(18.dp),
+                                                        )
+                                                    }
+                                                    DropdownMenu(
+                                                        expanded = collapseMenuExpanded,
+                                                        onDismissRequest = { collapseMenuExpanded = false },
+                                                    ) {
+                                                        collapseModeOptions.forEach { (mode, label) ->
+                                                            DropdownMenuItem(
+                                                                text = { Text(label) },
+                                                                onClick = {
+                                                                    profileStore.updateProfile(
+                                                                        profileStore.getActiveProfile().copy(dictionaryCollapseMode = mode),
+                                                                    )
+                                                                    collapseMenuExpanded = false
+                                                                },
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }
-                                            Spacer(Modifier.width(4.dp))
-                                            IconButton(
-                                                onClick = { DictionaryUpdateJob.checkNow(context) },
-                                                modifier = Modifier.size(28.dp),
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Outlined.CloudDownload,
-                                                    contentDescription = "Check now",
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(18.dp),
-                                                )
-                                            }
                                         }
                                     }
-                                }
-                            }
 
                                 item(key = "type_filter") {
                                     Surface(
@@ -2049,115 +1916,182 @@ object SettingsDictionaryScreen : SearchableSettings {
             }
         }
 
-        return Preference.PreferenceGroup(
-            title = stringResource(MR.strings.pref_anki),
-            preferenceItems = persistentListOf(
+        val deckEntries = remember(decks, selectedDeck) {
+            buildMap {
+                decks.forEach { put(it, it) }
+                if (selectedDeck.isNotBlank()) put(selectedDeck, selectedDeck)
+            }.toPersistentMap()
+        }
+        val modelEntries = remember(models, selectedModel) {
+            buildMap {
+                models.forEach { put(it, it) }
+                if (selectedModel.isNotBlank()) put(selectedModel, selectedModel)
+            }.toPersistentMap()
+        }
+        val dupScopeEntries = persistentListOf(
+            "deck" to "Deck only",
+            "all" to "Everywhere",
+        ).associate { it.first to it.second }.toPersistentMap()
+        val dupActionEntries = persistentListOf(
+            "prevent" to stringResource(MR.strings.pref_anki_duplicate_prevent),
+            "add" to stringResource(MR.strings.pref_anki_duplicate_add),
+            "overwrite" to stringResource(MR.strings.pref_anki_duplicate_overwrite),
+        ).associate { it.first to it.second }.toPersistentMap()
+        val cropModeEntries = persistentListOf(
+            "full" to "Full Image",
+            "crop" to "Crop Selection",
+        ).associate { it.first to it.second }.toPersistentMap()
+
+        val preferenceItems = buildList<Preference.PreferenceItem<*, *>> {
+            add(
                 Preference.PreferenceItem.CustomPreference(
-                    title = stringResource(MR.strings.pref_anki),
+                    title = stringResource(MR.strings.pref_anki_enable),
                     content = {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
-                                .padding(bottom = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            // Enable toggle
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = stringResource(MR.strings.pref_anki_enable),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                                Switch(
-                                    checked = enabled,
-                                    onCheckedChange = { checked ->
-                                        if (!checked) {
-                                            updateProfile { copy(ankiEnabled = false) }
-                                            return@Switch
+                        SwitchPreferenceWidget(
+                            title = stringResource(MR.strings.pref_anki_enable),
+                            checked = enabled,
+                            onCheckedChanged = { checked ->
+                                if (!checked) {
+                                    updateProfile { copy(ankiEnabled = false) }
+                                    return@SwitchPreferenceWidget
+                                }
+                                scope.launch {
+                                    val installed = bridge.isAnkiDroidInstalled()
+                                    if (!installed) {
+                                        context.toast(MR.strings.pref_anki_no_ankidroid)
+                                        return@launch
+                                    }
+                                    if (!bridge.hasPermission()) {
+                                        if (activity != null) {
+                                            pendingPermissionCheck = true
+                                            bridge.requestPermission(activity)
                                         }
-                                        scope.launch {
-                                            val installed = bridge.isAnkiDroidInstalled()
-                                            if (!installed) {
-                                                context.toast(MR.strings.pref_anki_no_ankidroid)
-                                                return@launch
-                                            }
-                                            if (!bridge.hasPermission()) {
-                                                if (activity != null) {
-                                                    pendingPermissionCheck = true
-                                                    bridge.requestPermission(activity)
-                                                }
-                                                return@launch
-                                            }
-                                            updateProfile { copy(ankiEnabled = true) }
-                                        }
-                                    },
-                                )
-                            }
+                                        return@launch
+                                    }
+                                    updateProfile { copy(ankiEnabled = true) }
+                                }
+                            },
+                        )
+                    },
+                ),
+            )
 
-                            if (enabled) {
-                                if (ankiInstalled == false) {
-                                    Text(
-                                        text = stringResource(MR.strings.pref_anki_no_ankidroid),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.error,
-                                    )
-                                } else if (isLoading) {
-                                    Text(
-                                        text = stringResource(MR.strings.pref_anki_loading),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                } else {
-                                    // Deck selector
-                                    AnkiDropdownPreference(
-                                        label = stringResource(MR.strings.pref_anki_deck),
-                                        value = selectedDeck,
-                                        options = decks,
-                                        onValueChange = { updateProfile { copy(ankiDeck = it) } },
-                                    )
+            if (!enabled) {
+                // only the enable switch
+            } else if (ankiInstalled == false) {
+                add(
+                    Preference.PreferenceItem.InfoPreference(
+                        title = stringResource(MR.strings.pref_anki_no_ankidroid),
+                    ),
+                )
+            } else if (isLoading) {
+                add(
+                    Preference.PreferenceItem.InfoPreference(
+                        title = stringResource(MR.strings.pref_anki_loading),
+                    ),
+                )
+            } else {
+                if (deckEntries.isNotEmpty()) {
+                    add(
+                        Preference.PreferenceItem.BasicListPreference(
+                            value = selectedDeck,
+                            entries = deckEntries,
+                            title = stringResource(MR.strings.pref_anki_deck),
+                            onValueChanged = { updateProfile { copy(ankiDeck = it) } },
+                        ),
+                    )
+                } else {
+                    add(
+                        Preference.PreferenceItem.TextPreference(
+                            title = stringResource(MR.strings.pref_anki_deck),
+                            subtitle = stringResource(MR.strings.pref_anki_select_deck),
+                        ),
+                    )
+                }
 
-                                    // Model selector
-                                    AnkiDropdownPreference(
-                                        label = stringResource(MR.strings.pref_anki_model),
-                                        value = selectedModel,
-                                        options = models,
-                                        onValueChange = {
-                                            if (it == selectedModel) {
-                                                return@AnkiDropdownPreference
-                                            }
-                                            updateProfile { copy(ankiModel = it, ankiFieldMap = "{}") }
+                if (modelEntries.isNotEmpty()) {
+                    add(
+                        Preference.PreferenceItem.BasicListPreference(
+                            value = selectedModel,
+                            entries = modelEntries,
+                            title = stringResource(MR.strings.pref_anki_model),
+                            onValueChanged = { newModel ->
+                                if (newModel != selectedModel) {
+                                    updateProfile { copy(ankiModel = newModel, ankiFieldMap = "{}") }
+                                }
+                            },
+                        ),
+                    )
+                } else {
+                    add(
+                        Preference.PreferenceItem.TextPreference(
+                            title = stringResource(MR.strings.pref_anki_model),
+                            subtitle = stringResource(MR.strings.pref_anki_select_model),
+                        ),
+                    )
+                }
+
+                add(
+                    Preference.PreferenceItem.CustomPreference(
+                        title = stringResource(MR.strings.pref_anki_default_tags),
+                        content = {
+                            EditTextPreferenceWidget(
+                                title = stringResource(MR.strings.pref_anki_default_tags),
+                                subtitle = tags.ifBlank { "—" },
+                                dialogSubtitle = "Comma-separated tags",
+                                icon = null,
+                                value = tags,
+                                canBeBlank = true,
+                                formatSubtitle = false,
+                                onConfirm = {
+                                    updateProfile { copy(ankiTags = it) }
+                                    true
+                                },
+                            )
+                        },
+                    ),
+                )
+
+                // Field mapping — collapsible section header matches PreferenceGroupHeader style
+                add(
+                    Preference.PreferenceItem.CustomPreference(
+                        title = stringResource(MR.strings.pref_anki_field_mapping),
+                        content = {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { fieldMappingExpanded = !fieldMappingExpanded }
+                                        .padding(bottom = 8.dp, top = 14.dp)
+                                        .padding(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = stringResource(MR.strings.pref_anki_field_mapping),
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    Icon(
+                                        imageVector = if (fieldMappingExpanded) {
+                                            Icons.Outlined.ExpandLess
+                                        } else {
+                                            Icons.Outlined.ExpandMore
                                         },
+                                        contentDescription = if (fieldMappingExpanded) "Collapse" else "Expand",
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(20.dp),
                                     )
+                                }
 
-                                    // Field mapping
+                                if (fieldMappingExpanded) {
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clickable { fieldMappingExpanded = !fieldMappingExpanded }
-                                            .padding(top = 4.dp),
+                                            .padding(horizontal = 16.dp)
+                                            .padding(bottom = 8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Text(
-                                                text = stringResource(MR.strings.pref_anki_field_mapping),
-                                                style = MaterialTheme.typography.titleSmall,
-                                            )
-                                            Icon(
-                                                imageVector = if (fieldMappingExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                                                contentDescription = if (fieldMappingExpanded) "Collapse" else "Expand",
-                                                modifier = Modifier.size(20.dp),
-                                            )
-                                        }
-                                    }
-
-                                    if (fieldMappingExpanded) {
                                         if (selectedModel.isNotBlank() && modelFields.isEmpty() && ankiInstalled == true) {
                                             Text(
                                                 text = "Loading model fields...",
@@ -2168,8 +2102,7 @@ object SettingsDictionaryScreen : SearchableSettings {
 
                                         modelFields.forEach { fieldName ->
                                             val storageValue = fieldMap[fieldName] ?: ""
-                                            val displayValue = storageValue
-                                                .ifBlank { "{}" }
+                                            val displayValue = storageValue.ifBlank { "{}" }
                                             AnkiFieldMappingRow(
                                                 fieldName = fieldName,
                                                 fieldValue = displayValue,
@@ -2191,17 +2124,14 @@ object SettingsDictionaryScreen : SearchableSettings {
 
                                         customFieldNames.forEach { fieldName ->
                                             val storageValue = fieldMap[fieldName] ?: ""
-                                            val displayValue = storageValue
-                                                .ifBlank { "{}" }
+                                            val displayValue = storageValue.ifBlank { "{}" }
                                             AnkiFieldMappingRow(
                                                 fieldName = fieldName,
                                                 fieldValue = displayValue,
                                                 onValueChange = { newDisplayValue ->
                                                     setFieldValue(fieldName, newDisplayValue, true)
                                                 },
-                                                onDeleteField = {
-                                                    removeCustomField(fieldName)
-                                                },
+                                                onDeleteField = { removeCustomField(fieldName) },
                                                 dictionaryNames = dictionaries,
                                             )
                                         }
@@ -2232,168 +2162,86 @@ object SettingsDictionaryScreen : SearchableSettings {
                                             Text("Add field")
                                         }
                                     }
-
-                                    // Duplicate handling
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Text(
-                                            text = stringResource(MR.strings.pref_anki_check_duplicates),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                        )
-                                        Switch(
-                                            checked = dupCheck,
-                                            onCheckedChange = { updateProfile { copy(ankiDupCheck = it) } },
-                                        )
-                                    }
-
-                                    if (dupCheck) {
-                                        AnkiDropdownPreference(
-                                            label = stringResource(MR.strings.pref_anki_duplicate_scope),
-                                            value = if (dupScope == "all") "Everywhere" else "Deck only",
-                                            options = listOf("deck", "all"),
-                                            displayOptions = listOf("Deck only", "Everywhere"),
-                                            onValueChange = { updateProfile { copy(ankiDupScope = it) } },
-                                        )
-                                        AnkiDropdownPreference(
-                                            label = stringResource(MR.strings.pref_anki_duplicate_action),
-                                            value = when (dupAction) {
-                                                "add" -> stringResource(MR.strings.pref_anki_duplicate_add)
-                                                "overwrite" -> stringResource(MR.strings.pref_anki_duplicate_overwrite)
-                                                else -> stringResource(MR.strings.pref_anki_duplicate_prevent)
-                                            },
-                                            options = listOf("prevent", "add", "overwrite"),
-                                            displayOptions = listOf(
-                                                stringResource(MR.strings.pref_anki_duplicate_prevent),
-                                                stringResource(MR.strings.pref_anki_duplicate_add),
-                                                stringResource(MR.strings.pref_anki_duplicate_overwrite),
-                                            ),
-                                            onValueChange = { updateProfile { copy(ankiDupAction = it) } },
-                                        )
-                                    }
-
-                                    // Default tags
-                                    OutlinedTextField(
-                                        value = tags,
-                                        onValueChange = { updateProfile { copy(ankiTags = it) } },
-                                        label = { Text(stringResource(MR.strings.pref_anki_default_tags)) },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        supportingText = { Text("Comma-separated tags") },
-                                    )
-
-                                    // Crop mode
-                                    var cropModeExpanded by remember { mutableStateOf(false) }
-                                    val cropModeOptions = listOf("full" to "Full Image", "crop" to "Crop Selection")
-                                    val cropModeDisplay = cropModeOptions.find { it.first == cropMode }?.second ?: "Full Image"
-
-                                    ExposedDropdownMenuBox(
-                                        expanded = cropModeExpanded,
-                                        onExpandedChange = { cropModeExpanded = it },
-                                    ) {
-                                        OutlinedTextField(
-                                            value = cropModeDisplay,
-                                            onValueChange = {},
-                                            label = { Text("Screenshot Mode") },
-                                            readOnly = true,
-                                            singleLine = true,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .menuAnchor(),
-                                            enabled = false,
-                                            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            ),
-                                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = cropModeExpanded) },
-                                        )
-
-                                        ExposedDropdownMenu(
-                                            expanded = cropModeExpanded,
-                                            onDismissRequest = { cropModeExpanded = false },
-                                        ) {
-                                            cropModeOptions.forEach { (value, label) ->
-                                                DropdownMenuItem(
-                                                    text = { Text(label) },
-                                                    onClick = {
-                                                        updateProfile { copy(ankiCropMode = value) }
-                                                        cropModeExpanded = false
-                                                    },
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    // Sync on create
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Text(
-                                            text = "Sync on card create",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                        )
-                                        Switch(
-                                            checked = activeProfile.ankiSyncOnCreate,
-                                            onCheckedChange = { updateProfile { copy(ankiSyncOnCreate = it) } },
-                                        )
-                                    }
                                 }
                             }
-                        }
-                    },
-                ),
-            ),
-        )
-    }
-
-    @Composable
-    private fun AnkiDropdownPreference(
-        label: String,
-        value: String,
-        options: List<String>,
-        displayOptions: List<String> = options,
-        onValueChange: (String) -> Unit,
-    ) {
-        var expanded by remember { mutableStateOf(false) }
-
-        Column(modifier = Modifier.fillMaxWidth()) {
-            OutlinedTextField(
-                value = value.ifBlank { "" },
-                onValueChange = {},
-                label = { Text(label) },
-                readOnly = true,
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = true },
-                enabled = false,
-                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                    disabledBorderColor = MaterialTheme.colorScheme.outline,
-                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            )
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.fillMaxWidth(0.9f),
-            ) {
-                options.zip(displayOptions).forEach { (opt, display) ->
-                    DropdownMenuItem(
-                        text = { Text(display) },
-                        onClick = {
-                            onValueChange(opt)
-                            expanded = false
                         },
+                    ),
+                )
+
+                add(
+                    Preference.PreferenceItem.CustomPreference(
+                        title = "Other",
+                        content = { PreferenceGroupHeader(title = "Other") },
+                    ),
+                )
+
+                add(
+                    Preference.PreferenceItem.CustomPreference(
+                        title = stringResource(MR.strings.pref_anki_check_duplicates),
+                        content = {
+                            SwitchPreferenceWidget(
+                                title = stringResource(MR.strings.pref_anki_check_duplicates),
+                                checked = dupCheck,
+                                onCheckedChanged = { updateProfile { copy(ankiDupCheck = it) } },
+                            )
+                        },
+                    ),
+                )
+
+                if (dupCheck) {
+                    add(
+                        Preference.PreferenceItem.BasicListPreference(
+                            value = if (dupScope == "all") "all" else "deck",
+                            entries = dupScopeEntries,
+                            title = stringResource(MR.strings.pref_anki_duplicate_scope),
+                            onValueChanged = { updateProfile { copy(ankiDupScope = it) } },
+                        ),
+                    )
+                    add(
+                        Preference.PreferenceItem.BasicListPreference(
+                            value = when (dupAction) {
+                                "add", "overwrite" -> dupAction
+                                else -> "prevent"
+                            },
+                            entries = dupActionEntries,
+                            title = stringResource(MR.strings.pref_anki_duplicate_action),
+                            onValueChanged = { updateProfile { copy(ankiDupAction = it) } },
+                        ),
                     )
                 }
+
+                add(
+                    Preference.PreferenceItem.BasicListPreference(
+                        value = if (cropMode == "crop") "crop" else "full",
+                        entries = cropModeEntries,
+                        title = "Screenshot mode",
+                        onValueChanged = { updateProfile { copy(ankiCropMode = it) } },
+                    ),
+                )
+
+                add(
+                    Preference.PreferenceItem.CustomPreference(
+                        title = "Sync on card create",
+                        content = {
+                            SwitchPreferenceWidget(
+                                title = "Sync on card create",
+                                subtitle = "Trigger AnkiDroid sync after mining a card",
+                                checked = activeProfile.ankiSyncOnCreate,
+                                onCheckedChanged = { updateProfile { copy(ankiSyncOnCreate = it) } },
+                            )
+                        },
+                    ),
+                )
             }
-        }
+        }.toPersistentList()
+
+        @Suppress("UNCHECKED_CAST")
+        return Preference.PreferenceGroup(
+            title = stringResource(MR.strings.pref_anki),
+            preferenceItems = preferenceItems as kotlinx.collections.immutable.ImmutableList<
+                Preference.PreferenceItem<out Any, out Any>
+                >,
+        )
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
