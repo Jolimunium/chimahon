@@ -9,7 +9,7 @@ class YouTubePreferences(context: Context) {
         context.getSharedPreferences("youtube_prefs", Context.MODE_PRIVATE)
 
     var addNewChannelsToLibrary: Boolean
-        get() = prefs.getBoolean(KEY_ADD_NEW_CHANNELS_TO_LIBRARY, true)
+        get() = prefs.getBoolean(KEY_ADD_NEW_CHANNELS_TO_LIBRARY, false)
         set(value) = prefs.edit().putBoolean(KEY_ADD_NEW_CHANNELS_TO_LIBRARY, value).apply()
 
     var preferredQuality: String
