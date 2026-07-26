@@ -52,6 +52,9 @@ import java.text.SimpleDateFormat
 import java.time.Instant
 import java.util.Date
 import java.util.Locale
+import eu.kanade.tachiyomi.data.backup.models.BackupSearchHistory
+import tachiyomi.domain.history.interactor.GetSearchHistory
+import tachiyomi.domain.history.model.SearchHistory
 
 class BackupCreator(
     private val context: Context,
@@ -79,6 +82,7 @@ class BackupCreator(
     // KMK <--
     // Chimahon -->
     private val novelBackupCreator: eu.kanade.tachiyomi.data.backup.create.creators.NovelBackupCreator = eu.kanade.tachiyomi.data.backup.create.creators.NovelBackupCreator(context),
+    private val getSearchHistory: GetSearchHistory = Injekt.get(),
     // Chimahon <--
     // SY -->
     private val savedSearchBackupCreator: SavedSearchBackupCreator = SavedSearchBackupCreator(),
@@ -143,6 +147,7 @@ class BackupCreator(
                 backupNovelCategories = backupNovelCategories(options),
                 backupMangaStats = backupMangaStats(options),
                 backupAnkiStats = backupAnkiStats(options),
+                backupSearchHistory = backupSearchHistory(options),
                 // Chimahon <--
             )
 
@@ -276,6 +281,18 @@ class BackupCreator(
     fun backupAnkiStats(options: BackupOptions): List<com.canopus.chimareader.data.AnkiStats> {
         if (!options.appSettings) return emptyList()
         return com.canopus.chimareader.data.AnkiStatsStorage.loadAll(context)
+    }
+
+    suspend fun backupSearchHistory(options: BackupOptions): List<BackupSearchHistory> {
+        if (!options.history) return emptyList()
+
+        return getSearchHistory.awaitAll().map {
+            BackupSearchHistory(
+                scope = it.scope,
+                query = it.query,
+                lastSearchedAt = it.lastSearchedAt,
+            )
+        }
     }
     // Chimahon <--
 
