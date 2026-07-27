@@ -43,6 +43,7 @@ import mihon.domain.animeextensionrepo.interactor.GetAnimeExtensionRepoCount
 import mihon.domain.animeextensionrepo.interactor.ReplaceAnimeExtensionRepo
 import mihon.domain.animeextensionrepo.interactor.UpdateAnimeExtensionRepo
 import mihon.domain.animeextensionrepo.repository.AnimeExtensionRepoRepository
+import mihon.domain.extensionrepo.service.ExtensionRepoService
 import mihon.domain.chapter.interactor.FilterChaptersForDownload
 import mihon.domain.extension.interactor.AddExtensionStore
 import mihon.domain.extension.interactor.GetExtensionStoreCountAsFlow
@@ -271,6 +272,7 @@ class DomainModule : InjektModule {
         addFactory { TrustExtension(get(), get()) }
 
         addSingletonFactory { ExtensionStoreService(get(), get(), get()) }
+        addSingletonFactory { ExtensionRepoService(get(), get()) }
         addSingletonFactory<ExtensionStoreRepository> { ExtensionStoreRepositoryImpl(get(), get()) }
         addFactory { AddExtensionStore(get()) }
         addFactory { GetExtensionStoreCountAsFlow(get()) }
