@@ -1,6 +1,6 @@
 [versions]
 aboutlib_version = "13.2.1"
-newpipe-extractor = "v0.26.3"
+newpipe-extractor = "v0.26.2"
 protobuf-javalite = "4.35.1"
 leakcanary = "2.14"
 moko = "0.26.4"
