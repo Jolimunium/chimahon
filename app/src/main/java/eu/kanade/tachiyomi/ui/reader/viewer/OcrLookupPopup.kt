@@ -754,8 +754,10 @@ fun OcrLookupPopup(
 
             for (idx in order) {
                 val p = all[idx]
-                val cx = p.x.coerceIn(paddingPx, screenWidthPx - w - paddingPx)
-                val cy = p.y.coerceIn(paddingPx, screenHeightPx - h - paddingPx)
+                val maxCx = (screenWidthPx - w - paddingPx).coerceAtLeast(paddingPx)
+                val maxCy = (screenHeightPx - h - paddingPx).coerceAtLeast(paddingPx)
+                val cx = p.x.coerceIn(paddingPx, maxCx)
+                val cy = p.y.coerceIn(paddingPx, maxCy)
 
                 val overlaps = cx < ax + expW && cx + w > ax &&
                     cy < ay + expH && cy + h > ay
@@ -770,8 +772,8 @@ fun OcrLookupPopup(
 
             if (!found) {
                 val pref = all[order[0]]
-                bestX = pref.x.coerceIn(paddingPx, screenWidthPx - w - paddingPx)
-                bestY = pref.y.coerceIn(paddingPx, screenHeightPx - h - paddingPx)
+                bestX = pref.x.coerceIn(paddingPx, (screenWidthPx - w - paddingPx).coerceAtLeast(paddingPx))
+                bestY = pref.y.coerceIn(paddingPx, (screenHeightPx - h - paddingPx).coerceAtLeast(paddingPx))
             } else {
                 bestX = bx
                 bestY = by
