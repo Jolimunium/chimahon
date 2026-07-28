@@ -601,8 +601,10 @@ window.hoshiReader = {
         var tag = el.tagName.toLowerCase();
         if (tag === 'img' || tag === 'svg') return el;
         if (tag === 'image' && el.closest) return el.closest('svg');
-        var child = el.querySelector && el.querySelector('img, svg');
-        if (child) return child;
+        for (var i = 0; i < el.children.length; i++) {
+            var childTag = el.children[i].tagName.toLowerCase();
+            if (childTag === 'img' || childTag === 'svg') return el.children[i];
+        }
         if (el.closest) {
             var anc = el.closest('figure, picture, svg');
             if (anc) {
