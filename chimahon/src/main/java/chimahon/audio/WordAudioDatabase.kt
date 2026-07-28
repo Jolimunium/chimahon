@@ -52,14 +52,31 @@ class WordAudioDatabase(private val context: Context) {
         }
         val fd = pfd.detachFd()
         val h = nativeOpen(fd, size)
-        if (h == 0L) {
-            lastError = "File is not a valid audio database"
-            return false
+        if (h != 0L) {
+            handle = h
+            currentUri = file.toURI().toString()
+            Log.i(TAG, "Opened audio database: $path")
+            return true
         }
-        handle = h
-        currentUri = file.toURI().toString()
-        Log.i(TAG, "Opened audio database: $path")
-        return true
+
+        // Native mmap rejected the file; try legacy SQLiteDatabase.
+        try {
+            legacyDb = SQLiteDatabase.openDatabase(
+                file.absolutePath,
+                null,
+                SQLiteDatabase.OPEN_READONLY,
+            )
+            if (legacyDb != null) {
+                currentUri = file.toURI().toString()
+                fallbackUsed = true
+                lastError = null
+                Log.i(TAG, "Opened audio database (legacy fallback): $path")
+                return true
+            }
+        } catch (_: Exception) { }
+
+        lastError = "File is not a valid audio database"
+        return false
     }
 
     /** Opens any SAF Uri using a direct file descriptor, then a streamed private-file fallback. */
