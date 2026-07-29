@@ -4,6 +4,30 @@ All notable changes to Chimahon are documented here.
 
 The format follows a Keep a Changelog style and uses Semantic Versioning.
 
+## [v2.3.1]
+
+### Added
+- OCR source selection in the reader
+- Cross-screen search history
+- Long-press mode switcher on Browse navbar icon
+- Animated AVIF scene mining for Anki
+
+### Changed
+- Enabled history tab swiping
+- Reduced long-press duration for library/browse mode dropdown menus
+- YouTube sentence audio mining now uses AAC transcode
+
+### Fixed
+- Audio path update failing on some devices
+- Novel reader incorrectly triggering image taps on unrelated space
+- Fix oversized images in novel reader
+- Anime downloads not respecting extension quality preferences
+- OCR lookup popup crash on narrow screens
+- YouTube crash on some older Android versions
+- Crash when adding anime repositories
+- Anime cover images not loading for some sources
+- MPV certificate storage on some devices
+
 ## [v2.3.0]
 
 Rebased on latest Komikku upstream, bringing TachiyomiX 1.6 extension support and other upstream fixes.
