@@ -50,6 +50,7 @@ import eu.kanade.domain.ui.model.NavTabLayout
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.isTabletUi
 import eu.kanade.tachiyomi.ui.browse.BrowseTab
+import eu.kanade.tachiyomi.ui.browse.BrowseViewMode
 import eu.kanade.tachiyomi.ui.dictionary.DictionaryTab
 import eu.kanade.tachiyomi.ui.download.DownloadQueueScreen
 import eu.kanade.tachiyomi.ui.history.HistoryTab
@@ -274,6 +275,14 @@ object HomeScreen : Screen() {
                             scope.launch { LibraryTab.selectLibraryMode(mode) }
                         },
                     )
+                } else if (tab == BrowseTab) {
+                    BrowseNavigationIcon(
+                        onClick = onClickTab,
+                        onModeSelected = { mode ->
+                            if (!selected) tabNavigator.current = BrowseTab
+                            scope.launch { BrowseTab.selectBrowseMode(mode) }
+                        },
+                    )
                 } else {
                     NavigationIconItem(tab)
                 }
@@ -317,6 +326,50 @@ object HomeScreen : Screen() {
                 onDismissRequest = { expanded = false },
             ) {
                 LibraryViewMode.entries.forEach { mode ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = stringResource(mode.labelRes),
+                                fontWeight = if (mode == selectedMode) FontWeight.Bold else FontWeight.Normal,
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            onModeSelected(mode)
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun BrowseNavigationIcon(
+        onClick: () -> Unit,
+        onModeSelected: (BrowseViewMode) -> Unit,
+    ) {
+        var expanded by remember { mutableStateOf(false) }
+        val interactionSource = remember { MutableInteractionSource() }
+        val selectedMode = BrowseViewMode.entries.getOrElse(
+            Injekt.get<UiPreferences>().lastUsedBrowseMode().get(),
+        ) { BrowseViewMode.Sources }
+
+        Box {
+            Box(
+                modifier = Modifier.combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick,
+                    onLongClick = { expanded = true },
+                ),
+            ) {
+                NavigationIconItem(BrowseTab)
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                BrowseViewMode.entries.forEach { mode ->
                     DropdownMenuItem(
                         text = {
                             Text(
