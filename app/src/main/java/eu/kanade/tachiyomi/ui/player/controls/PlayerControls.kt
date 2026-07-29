@@ -105,7 +105,9 @@ import eu.kanade.tachiyomi.ui.player.controls.components.VolumeSlider
 import eu.kanade.tachiyomi.ui.player.controls.components.panels.SubtitlesBorderStyle
 import eu.kanade.tachiyomi.ui.player.controls.components.panels.toColorHexString
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.toFixed
+import eu.kanade.tachiyomi.ui.player.scene.SceneClockDomain
 import eu.kanade.tachiyomi.ui.player.scene.SceneRangeCandidate
+import eu.kanade.tachiyomi.ui.player.scene.SceneRangeProvenance
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
@@ -1101,7 +1103,14 @@ private fun TextLayoutResult.subtitleLookupSelectionForTap(
         lineTop = lineBounds.top,
         lineWidth = lineBounds.width,
         lineHeight = lineBounds.height,
-        parsedSubtitleCandidate = cue?.sceneTimingCandidate,
+        parsedSubtitleCandidate = cue?.sceneTimingCandidate ?: cue?.let {
+            SceneRangeCandidate(
+                startSeconds = it.positionSeconds,
+                endSeconds = it.endPositionSeconds,
+                clockDomain = SceneClockDomain.SUBTITLE,
+                provenance = SceneRangeProvenance.PARSED_SUBTITLE_CUE,
+            )
+        },
     )
 }
 
