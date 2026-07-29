@@ -112,6 +112,12 @@ data object BrowseTab : Tab {
 
     private val switchToExtensionTabChannel = Channel<BrowseViewMode>(1, BufferOverflow.DROP_OLDEST)
 
+    private val modeSelectionEvent = Channel<BrowseViewMode>(Channel.BUFFERED)
+
+    suspend fun selectBrowseMode(mode: BrowseViewMode) {
+        modeSelectionEvent.send(mode)
+    }
+
     fun showExtension() {
         switchToExtensionTabChannel.trySend(BrowseViewMode.Sources)
     }
@@ -313,6 +319,13 @@ data object BrowseTab : Tab {
                         pagerState.scrollToPage(extensionsIndex)
                     }
                 }
+        }
+
+        LaunchedEffect(Unit) {
+            modeSelectionEvent.receiveAsFlow().collectLatest { mode ->
+                browseMode = mode
+                uiPreferences.lastUsedBrowseMode().set(mode.ordinal)
+            }
         }
 
         LaunchedEffect(Unit) {
