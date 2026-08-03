@@ -80,7 +80,6 @@ import chimahon.HoshiDicts
 import chimahon.anki.AnkiCardCreator
 import chimahon.anki.AnkiDroidBridge
 import chimahon.anki.AnkiProfile
-import chimahon.anki.AnkiScreenshotMode
 import chimahon.anki.LapisPreset
 import chimahon.anki.Marker
 import chimahon.dictionary.readDictionaryIndex
@@ -2009,8 +2008,6 @@ object SettingsDictionaryScreen : SearchableSettings {
         val cropModeEntries = persistentListOf(
             "full" to "Screenshot",
             "crop" to "Crop Overlay",
-            AnkiScreenshotMode.ANIMATED_SCENE.storageValue to
-                stringResource(KMR.strings.pref_anki_screenshot_animated_scene),
             "no_screenshot" to "No Screenshot",
         ).associate { it.first to it.second }.toPersistentMap()
         val cropPresetEntries = persistentListOf(
@@ -2295,10 +2292,7 @@ object SettingsDictionaryScreen : SearchableSettings {
                     ),
                 )
 
-                if (
-                    cropMode != "no_screenshot" &&
-                    cropMode != AnkiScreenshotMode.ANIMATED_SCENE.storageValue
-                ) {
+                if (cropMode != "no_screenshot") {
                     add(
                         Preference.PreferenceItem.BasicListPreference(
                             value = cropPreset.takeIf { it in cropPresetMap } ?: "full",

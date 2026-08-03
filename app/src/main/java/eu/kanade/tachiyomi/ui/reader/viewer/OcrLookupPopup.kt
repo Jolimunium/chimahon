@@ -60,8 +60,6 @@ import chimahon.KanjiResult
 import chimahon.LookupResult
 import chimahon.MediaInfo
 import chimahon.anki.AnkiCardCreator
-import chimahon.anki.AnkiMediaRequest
-import chimahon.anki.AnkiMediaWarning
 import chimahon.anki.AnkiResult
 import chimahon.util.ImageEncoder
 import eu.kanade.tachiyomi.ui.dictionary.buildKanjiEntryJson
@@ -144,11 +142,6 @@ fun OcrLookupPopup(
     screenshot: Bitmap? = null,
     onRequestScreenshot: (suspend () -> Bitmap?)? = null,
     onRequestSentenceAudio: (suspend () -> ByteArray?)? = null,
-    mediaRequest: AnkiMediaRequest? = null,
-    miningBusy: Boolean = false,
-    launchMiningJob: ((suspend () -> Unit) -> Boolean)? = null,
-    onMiningBusy: () -> Unit = {},
-    onAnkiMediaWarnings: (List<AnkiMediaWarning>) -> Unit = {},
     onCropTriggered: ((Long, Int?) -> Unit)? = null,
     initialLookupDeferred: kotlinx.coroutines.Deferred<chimahon.DictionaryRepository.LookupResult2>? = null,
     initialEntryJsons: List<String>? = null,
@@ -522,19 +515,6 @@ fun OcrLookupPopup(
         }
     }
 
-    fun submitMining(block: suspend () -> Unit) {
-        if (miningBusy) {
-            onMiningBusy()
-            return
-        }
-        val launcher = launchMiningJob
-        if (launcher == null) {
-            miningScope.launch { block() }
-        } else if (!launcher(block)) {
-            onMiningBusy()
-        }
-    }
-
     fun performAnkiLookup(
         index: Int,
         glossaryIndex: Int?,
@@ -566,8 +546,8 @@ fun OcrLookupPopup(
         val shouldUseCropMode = screenshotFieldMapped && cropMode == "crop" && onCropTriggered != null
 
         if (shouldUseCropMode) {
-            submitMining {
-                val sentenceAudioBytes = if (mediaRequest == null && sentenceAudioFieldMapped) {
+            miningScope.launch {
+                val sentenceAudioBytes = if (sentenceAudioFieldMapped) {
                     onRequestSentenceAudio?.invoke()
                 } else {
                     null
@@ -596,13 +576,11 @@ fun OcrLookupPopup(
                     syncOnCreate = ankiSyncOnCreate,
                     profileId = activeProfile.id,
                     titleId = titleId,
-                    mediaRequest = mediaRequest,
                 )
                 if (ankiResult is AnkiResult.Success || ankiResult is AnkiResult.CardExists || ankiResult is AnkiResult.OpenCard) {
                     withContext(kotlinx.coroutines.Dispatchers.Main) {
                         when (ankiResult) {
                             is AnkiResult.Success -> {
-                                onAnkiMediaWarnings(ankiResult.warnings)
                                 updateStatus(result.term.expression)
                                 dismissPopup()
                                 onCropTriggered.invoke(ankiResult.noteId, glossaryIndex)
@@ -632,17 +610,13 @@ fun OcrLookupPopup(
                 }
             }
         } else {
-            submitMining {
-                val encoding = if (
-                    mediaRequest == null &&
-                    screenshotFieldMapped &&
-                    cropMode != "no_screenshot"
-                ) {
+            miningScope.launch {
+                val encoding = if (screenshotFieldMapped && cropMode != "no_screenshot") {
                     onRequestScreenshot?.invoke()?.let { ImageEncoder.encode(it) }
                 } else {
                     null
                 }
-                val sentenceAudioBytes = if (mediaRequest == null && sentenceAudioFieldMapped) {
+                val sentenceAudioBytes = if (sentenceAudioFieldMapped) {
                     onRequestSentenceAudio?.invoke()
                 } else {
                     null
@@ -672,12 +646,10 @@ fun OcrLookupPopup(
                     syncOnCreate = ankiSyncOnCreate,
                     profileId = activeProfile.id,
                     titleId = titleId,
-                    mediaRequest = mediaRequest,
                 )
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
                     when (ankiResult) {
                         is AnkiResult.Success -> {
-                            onAnkiMediaWarnings(ankiResult.warnings)
                             updateStatus(result.term.expression)
                             context.toast(MR.strings.anki_card_added)
                         }
@@ -1339,11 +1311,6 @@ fun OcrLookupPopup(
             screenshot = screenshot,
             onRequestScreenshot = onRequestScreenshot,
             onRequestSentenceAudio = onRequestSentenceAudio,
-            mediaRequest = mediaRequest,
-            miningBusy = miningBusy,
-            launchMiningJob = launchMiningJob,
-            onMiningBusy = onMiningBusy,
-            onAnkiMediaWarnings = onAnkiMediaWarnings,
             onCropTriggered = onCropTriggered,
             usePopup = usePopup,
             onTermMatched = null,
