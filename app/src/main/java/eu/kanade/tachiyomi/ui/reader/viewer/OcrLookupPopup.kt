@@ -141,6 +141,7 @@ fun OcrLookupPopup(
     mediaInfo: MediaInfo? = null,
     screenshot: Bitmap? = null,
     onRequestScreenshot: (suspend () -> Bitmap?)? = null,
+    onRequestAnimatedScene: (suspend () -> ByteArray?)? = null,
     onRequestSentenceAudio: (suspend () -> ByteArray?)? = null,
     onCropTriggered: ((Long, Int?) -> Unit)? = null,
     initialLookupDeferred: kotlinx.coroutines.Deferred<chimahon.DictionaryRepository.LookupResult2>? = null,
@@ -616,6 +617,14 @@ fun OcrLookupPopup(
                 } else {
                     null
                 }
+                val screenshotBytes = if (
+                    cropMode == chimahon.anki.AnkiScreenshotMode.ANIMATED_SCENE.storageValue &&
+                    onRequestAnimatedScene != null
+                ) {
+                    onRequestAnimatedScene.invoke()
+                } else {
+                    encoding?.bytes
+                }
                 val sentenceAudioBytes = if (sentenceAudioFieldMapped) {
                     onRequestSentenceAudio?.invoke()
                 } else {
@@ -635,7 +644,7 @@ fun OcrLookupPopup(
                     offset = miningOffset,
                     media = mediaInfo,
                     glossaryIndex = glossaryIndex,
-                    screenshotBytes = encoding?.bytes,
+                    screenshotBytes = screenshotBytes,
                     sentenceAudioBytes = sentenceAudioBytes,
                     selection = result.matched,
                     selectedDict = selectedDict,

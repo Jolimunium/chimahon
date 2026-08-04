@@ -26,16 +26,12 @@ import android.app.Application
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.net.Uri
 import android.provider.Settings
 import android.util.DisplayMetrics
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.runtime.Immutable
-import com.arthenica.ffmpegkit.FFmpegKitConfig
-import com.arthenica.ffmpegkit.FFmpegSession
-import com.arthenica.ffmpegkit.ReturnCode
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -106,7 +102,6 @@ import eu.kanade.tachiyomi.util.lang.byteSize
 import eu.kanade.tachiyomi.util.lang.takeBytes
 import eu.kanade.tachiyomi.util.storage.DiskUtil
 import eu.kanade.tachiyomi.util.storage.cacheImageDir
-import eu.kanade.tachiyomi.util.storage.toFFmpegString
 import eu.kanade.tachiyomi.util.system.toast
 import `is`.xyz.mpv.MPVLib
 import `is`.xyz.mpv.Utils
@@ -157,13 +152,14 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
 import java.io.InputStream
-import java.util.Locale
 import java.util.Date
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.collections.first
 import kotlin.coroutines.cancellation.CancellationException
 
 private const val MAX_SUBTITLE_HISTORY = 120
+private const val MAX_SCENE_DIMENSION = 640
+private const val SCENE_DIMENSION_ALIGNMENT = 16
 private const val VIDEO_SELECTION_DELIMITER = "\u001e"
 class PlayerViewModelProviderFactory(
     private val activity: PlayerActivity,
@@ -354,6 +350,15 @@ class PlayerViewModel @JvmOverloads constructor(
     val remainingTime = _remainingTime.asStateFlow()
 
     val cachePath: String = activity.cacheDir.path
+
+    val mediaCapture = PlayerMediaCaptureService(
+        context = activity,
+        cachePath = cachePath,
+        getVideo = { currentVideo.value },
+        getSource = { currentSource.value },
+        getTimeSeconds = { activity.player.timePos?.toDouble() ?: pos.value.toDouble() },
+        getOcrPaddingSeconds = { dictionaryPreferences.videoOcrSentenceAudioPaddingSeconds().get().toDouble() },
+    )
 
     private val _customButtons = MutableStateFlow<CustomButtonFetchState>(CustomButtonFetchState.Loading)
 
@@ -3083,100 +3088,17 @@ class PlayerViewModel @JvmOverloads constructor(
         return newFile.takeIf { it.exists() }?.inputStream()
     }
 
-    suspend fun captureVideoFrameForOcr(): Bitmap? {
-        val file = File(cachePath, "${System.currentTimeMillis()}_mpv_ocr_frame.png")
-        return runCatching {
-            withUIContext {
-                file.delete()
-                MPVLib.command(arrayOf("screenshot-to-file", file.absolutePath, "video"))
-            }
-            withIOContext {
-                repeat(20) {
-                    if (file.exists() && file.length() > 0L) {
-                        return@withIOContext BitmapFactory.decodeFile(file.absolutePath)
-                    }
-                    Thread.sleep(25L)
-                }
-                file.takeIf { it.exists() && it.length() > 0L }
-                    ?.let { BitmapFactory.decodeFile(it.absolutePath) }
-            }
-        }.onFailure {
-            logcat(LogPriority.ERROR, it)
-        }.getOrNull().also {
-            file.delete()
-        }
-    }
+    suspend fun captureVideoFrameForOcr(): Bitmap? = mediaCapture.captureVideoFrameForOcr()
 
-    suspend fun captureSubtitleAudioForAnki(startSeconds: Double?, endSeconds: Double?): ByteArray? {
-        val start = startSeconds ?: return null
-        val end = endSeconds ?: return null
-        if (end <= start) return null
+    suspend fun captureSubtitleAudioForAnki(startSeconds: Double?, endSeconds: Double?): ByteArray? =
+        mediaCapture.captureSubtitleAudioForAnki(startSeconds, endSeconds)
 
-        val video = currentVideo.value ?: return null
-        val output = File(activity.cacheDir, "chimahon_sentence_audio_${System.currentTimeMillis()}.m4a")
-        return runCatching {
-            withIOContext {
-                output.delete()
+    suspend fun captureVideoOcrAudioForAnki(): ByteArray? = mediaCapture.captureVideoOcrAudioForAnki()
 
-                // For video-only streams (e.g. YouTube DASH), use the separate audio track URL
-                val audioSource = video.audioTracks.firstOrNull()?.url
-                val rawInput = audioSource
-                    ?: MPVLib.getPropertyString("path")
-                        ?.takeIf { it.isNotBlank() }
-                        ?: video.videoUrl
-                val input = when {
-                    video.videoUrl.startsWith("content://") -> Uri.parse(video.videoUrl).toFFmpegString(activity)
-                    rawInput.startsWith("file://") -> Uri.parse(rawInput).path ?: rawInput
-                    else -> rawInput
-                }.replace("\"", "\\\"")
+    suspend fun captureAnimatedVideoForAnki(startSeconds: Double?, endSeconds: Double?): ByteArray? =
+        mediaCapture.captureAnimatedVideoForAnki(startSeconds, endSeconds)
 
-                val source = currentSource.value as? AnimeHttpSource
-                val headers = video.headers ?: source?.headers
-                val headerOptions = if (rawInput.startsWith("http") && headers != null) {
-                    headers.joinToString("", "-headers '", "'") {
-                        "${it.first}: ${it.second.replace("'", "'\\''")}\r\n"
-                    }
-                } else {
-                    ""
-                }
-                val duration = (end - start).coerceIn(0.25, 30.0)
-                val command = listOf(
-                    headerOptions,
-                    "-ss ${start.coerceAtLeast(0.0).formatSeconds()}",
-                    "-t ${duration.formatSeconds()}",
-                    "-i \"$input\"",
-                    "-vn",
-                    "-map 0:a:0",
-                    "-c:a copy",
-                    "\"${output.absolutePath.replace("\"", "\\\"")}\"",
-                    "-y",
-                )
-                    .filter { it.isNotBlank() }
-                    .joinToString(" ")
-                val session = FFmpegSession.create(FFmpegKitConfig.parseArguments(command))
-                FFmpegKitConfig.ffmpegExecute(session)
-                if (ReturnCode.isSuccess(session.returnCode) && output.exists() && output.length() > 0L) {
-                    output.readBytes()
-                } else {
-                    session.failStackTrace?.let { logcat(LogPriority.WARN) { it } }
-                    null
-                }
-            }
-        }.onFailure {
-            logcat(LogPriority.WARN, it) { "Failed to capture subtitle sentence audio" }
-        }.getOrNull().also {
-            output.delete()
-        }
-    }
-
-    suspend fun captureVideoOcrAudioForAnki(): ByteArray? {
-        val centerSeconds = activity.player.timePos?.toDouble() ?: pos.value.toDouble()
-        val paddingSeconds = dictionaryPreferences.videoOcrSentenceAudioPaddingSeconds().get().toDouble()
-        return captureSubtitleAudioForAnki(
-            startSeconds = centerSeconds - paddingSeconds,
-            endSeconds = centerSeconds + paddingSeconds,
-        )
-    }
+    suspend fun captureVideoOcrAnimatedForAnki(): ByteArray? = mediaCapture.captureVideoOcrAnimatedForAnki()
 
     /**
      * Saves the screenshot on the pictures directory and notifies the UI of the result.
@@ -3518,8 +3440,4 @@ fun CustomButton.executeLongPress() {
 
 fun Float.normalize(inMin: Float, inMax: Float, outMin: Float, outMax: Float): Float {
     return (this - inMin) * (outMax - outMin) / (inMax - inMin) + outMin
-}
-
-private fun Double.formatSeconds(): String {
-    return String.format(Locale.US, "%.3f", this)
 }

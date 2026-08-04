@@ -2125,7 +2125,21 @@ object AnkiCardCreator {
         } catch (e: Exception) {
             "screenshot_${System.currentTimeMillis()}"
         }
-        return "chimahon_$hash.webp"
+        val extension = if (isAvif(bytes)) "avif" else "webp"
+        return "chimahon_$hash.$extension"
+    }
+
+    private fun isAvif(bytes: ByteArray): Boolean {
+        // ftyp box: 4-byte size + "ftyp" at offset 4
+        return bytes.size >= 12 &&
+            bytes[4] == 'f'.code.toByte() &&
+            bytes[5] == 't'.code.toByte() &&
+            bytes[6] == 'y'.code.toByte() &&
+            bytes[7] == 'p'.code.toByte() &&
+            bytes[8] == 'a'.code.toByte() &&
+            bytes[9] == 'v'.code.toByte() &&
+            bytes[10] == 'i'.code.toByte() &&
+            bytes[11] == 's'.code.toByte()
     }
 
     private fun generateSentenceAudioFilename(bytes: ByteArray, extension: String): String {

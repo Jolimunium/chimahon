@@ -107,6 +107,12 @@ internal fun PlayerSubtitleLookupPopup(
         onRequestScreenshot = {
             viewModel.captureVideoFrameForOcr()
         },
+        onRequestAnimatedScene = {
+            viewModel.captureAnimatedVideoForAnki(
+                startSeconds = request?.cueStartSeconds,
+                endSeconds = request?.cueEndSeconds,
+            )
+        },
         onRequestSentenceAudio = {
             viewModel.captureSubtitleAudioForAnki(
                 startSeconds = request?.cueStartSeconds,

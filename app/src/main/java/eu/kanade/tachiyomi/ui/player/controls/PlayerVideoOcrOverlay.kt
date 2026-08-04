@@ -232,6 +232,7 @@ internal fun PlayerVideoOcrOverlay(
                         mangaTitle = anime?.title.orEmpty(),
                         chapterName = episode?.name.orEmpty(),
                     ),
+                    onRequestAnimatedScene = { viewModel.captureVideoOcrAnimatedForAnki() },
                     onRequestSentenceAudio = { viewModel.captureVideoOcrAudioForAnki() },
                     usePopup = false,
                     titleId = anime?.id?.toString(),
