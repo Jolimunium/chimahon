@@ -297,4 +297,7 @@
     <string name="anki_sentence_audio_extraction_output_write_failed">[Output Write Failed] FFmpeg could not write the temporary sentence audio file. The card was created without it.</string>
     <string name="anki_sentence_audio_extraction_timed_out">[Extraction Timed Out] Sentence audio extraction timed out. The card was created without it.</string>
     <string name="anki_sentence_audio_storage_failed">[Audio Storage Failed] AnkiDroid could not store the sentence audio. The card was created without it.</string>
+    <!-- Search history -->
+    <string name="pref_search_history">Search history</string>
+    <string name="pref_search_history_summary">Remember recent searches across screens</string>
 </resources>

@@ -57,7 +57,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.components.UpIcon
+import tachiyomi.presentation.core.util.collectAsState
 import eu.kanade.presentation.more.settings.screen.player.PlayerSettingsAdvancedScreen
 import eu.kanade.presentation.more.settings.screen.player.PlayerSettingsAudioScreen
 import eu.kanade.presentation.more.settings.screen.player.PlayerSettingsDecoderScreen
@@ -103,16 +105,20 @@ class SettingsSearchScreen : Screen() {
         }
 
         val scope = rememberCoroutineScope()
+        val uiPreferences = remember { Injekt.get<UiPreferences>() }
+        val searchHistoryEnabled by uiPreferences.searchHistoryEnabled().collectAsState()
         val getSearchHistory: GetSearchHistory = remember { Injekt.get() }
         val upsertSearchHistory: UpsertSearchHistory = remember { Injekt.get() }
         val deleteSearchHistory: DeleteSearchHistory = remember { Injekt.get() }
         val historyState by produceState<List<SearchHistory>>(initialValue = emptyList()) {
-            getSearchHistory.subscribe(SearchHistory.SCOPE_SETTINGS).collect { value = it }
+            if (searchHistoryEnabled) {
+                getSearchHistory.subscribe(SearchHistory.SCOPE_SETTINGS).collect { value = it }
+            }
         }
 
         val handleSearch: (String) -> Unit = { query ->
             val trimmed = query.trim()
-            if (trimmed.isNotBlank()) {
+            if (trimmed.isNotBlank() && searchHistoryEnabled) {
                 scope.launch {
                     upsertSearchHistory.await(SearchHistory.SCOPE_SETTINGS, trimmed)
                 }
@@ -175,7 +181,7 @@ class SettingsSearchScreen : Screen() {
                             }
                         },
                     )
-                    if (historyState.isNotEmpty()) {
+                    if (searchHistoryEnabled && historyState.isNotEmpty()) {
                         SearchHistoryRow(
                             historyList = historyState,
                             onSelectQuery = { query ->
@@ -184,10 +190,14 @@ class SettingsSearchScreen : Screen() {
                                 focusManager.clearFocus()
                             },
                             onDeleteQuery = { query ->
-                                scope.launch { deleteSearchHistory.await(SearchHistory.SCOPE_SETTINGS, query) }
+                                if (searchHistoryEnabled) {
+                                    scope.launch { deleteSearchHistory.await(SearchHistory.SCOPE_SETTINGS, query) }
+                                }
                             },
                             onClearAll = {
-                                scope.launch { deleteSearchHistory.clearScope(SearchHistory.SCOPE_SETTINGS) }
+                                if (searchHistoryEnabled) {
+                                    scope.launch { deleteSearchHistory.clearScope(SearchHistory.SCOPE_SETTINGS) }
+                                }
                             },
                         )
                     }

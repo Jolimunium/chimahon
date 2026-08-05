@@ -59,6 +59,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.collections.immutable.ImmutableList
+import eu.kanade.domain.ui.UiPreferences
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 import androidx.compose.runtime.produceState
@@ -71,6 +72,7 @@ import tachiyomi.domain.history.model.SearchHistory
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import tachiyomi.presentation.core.util.clearFocusOnSoftKeyboardHide
+import tachiyomi.presentation.core.util.collectAsState
 import tachiyomi.presentation.core.util.runOnEnterKeyPressed
 import tachiyomi.presentation.core.util.secondaryItemAlpha
 import tachiyomi.presentation.core.util.showSoftKeyboard
@@ -354,6 +356,9 @@ fun SearchToolbar(
     val focusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
 
+    val uiPreferences = remember { Injekt.get<UiPreferences>() }
+    val searchHistoryEnabled by uiPreferences.searchHistoryEnabled().collectAsState()
+
     val getSearchHistory: GetSearchHistory = remember { Injekt.get() }
     val upsertSearchHistory: UpsertSearchHistory = remember { Injekt.get() }
     val deleteSearchHistory: DeleteSearchHistory = remember { Injekt.get() }
@@ -362,7 +367,7 @@ fun SearchToolbar(
         initialValue = emptyList(),
         key1 = searchHistoryScope,
     ) {
-        if (searchHistoryScope != null) {
+        if (searchHistoryScope != null && searchHistoryEnabled) {
             getSearchHistory.subscribe(searchHistoryScope).collect { value = it }
         } else {
             value = emptyList()
@@ -374,7 +379,7 @@ fun SearchToolbar(
     val handleSearch: (String) -> Unit = { query ->
         val trimmed = query.trim()
         if (trimmed.isNotBlank()) {
-            if (searchHistoryScope != null) {
+            if (searchHistoryScope != null && searchHistoryEnabled) {
                 scope.launch {
                     upsertSearchHistory.await(searchHistoryScope, trimmed)
                 }
@@ -512,7 +517,7 @@ fun SearchToolbar(
                     onSelectSearchHistory?.invoke(query)
                 },
                 onDeleteQuery = { query ->
-                    if (searchHistoryScope != null) {
+                    if (searchHistoryScope != null && searchHistoryEnabled) {
                         scope.launch {
                             deleteSearchHistory.await(searchHistoryScope, query)
                         }
@@ -520,7 +525,7 @@ fun SearchToolbar(
                     onDeleteSearchHistory?.invoke(query)
                 },
                 onClearAll = {
-                    if (searchHistoryScope != null) {
+                    if (searchHistoryScope != null && searchHistoryEnabled) {
                         scope.launch {
                             deleteSearchHistory.clearScope(searchHistoryScope)
                         }

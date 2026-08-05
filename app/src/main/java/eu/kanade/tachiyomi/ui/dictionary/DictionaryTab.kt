@@ -32,7 +32,9 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.components.SearchHistoryRow
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -207,11 +209,15 @@ data object DictionaryTab : Tab {
         val focusManager = LocalFocusManager.current
         val focusRequester = remember { FocusRequester() }
 
+        val uiPreferences = remember { Injekt.get<UiPreferences>() }
+        val searchHistoryEnabled by uiPreferences.searchHistoryEnabled().collectAsState()
         val getSearchHistory: GetSearchHistory = remember { Injekt.get() }
         val upsertSearchHistory: UpsertSearchHistory = remember { Injekt.get() }
         val deleteSearchHistory: DeleteSearchHistory = remember { Injekt.get() }
         val searchHistoryList by produceState<List<SearchHistory>>(initialValue = emptyList()) {
-            getSearchHistory.subscribe(SearchHistory.SCOPE_DICTIONARY).collect { value = it }
+            if (searchHistoryEnabled) {
+                getSearchHistory.subscribe(SearchHistory.SCOPE_DICTIONARY).collect { value = it }
+            }
         }
 
         val dictionaryPreferences = remember { Injekt.get<DictionaryPreferences>() }
@@ -357,7 +363,7 @@ data object DictionaryTab : Tab {
 
         fun saveDictionaryHistory(targetQuery: String) {
             val trimmed = targetQuery.trim()
-            if (trimmed.isNotBlank()) {
+            if (trimmed.isNotBlank() && searchHistoryEnabled) {
                 scope.launch(Dispatchers.IO) {
                     upsertSearchHistory.await(SearchHistory.SCOPE_DICTIONARY, trimmed)
                 }
@@ -620,7 +626,7 @@ data object DictionaryTab : Tab {
             }
 
             // Search history chips
-            if (searchHistoryList.isNotEmpty()) {
+            if (searchHistoryEnabled && searchHistoryList.isNotEmpty()) {
                 SearchHistoryRow(
                     historyList = searchHistoryList,
                     onSelectQuery = { selectedQuery ->
@@ -635,13 +641,17 @@ data object DictionaryTab : Tab {
                         focusManager.clearFocus()
                     },
                     onDeleteQuery = { queryToDelete ->
-                        scope.launch {
-                            deleteSearchHistory.await(SearchHistory.SCOPE_DICTIONARY, queryToDelete)
+                        if (searchHistoryEnabled) {
+                            scope.launch {
+                                deleteSearchHistory.await(SearchHistory.SCOPE_DICTIONARY, queryToDelete)
+                            }
                         }
                     },
                     onClearAll = {
-                        scope.launch {
-                            deleteSearchHistory.clearScope(SearchHistory.SCOPE_DICTIONARY)
+                        if (searchHistoryEnabled) {
+                            scope.launch {
+                                deleteSearchHistory.clearScope(SearchHistory.SCOPE_DICTIONARY)
+                            }
                         }
                     },
                 )

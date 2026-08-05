@@ -138,6 +138,18 @@ object SettingsBrowseScreen : SearchableSettings {
                 ),
             ),
             // SY <--
+            // KMK -->
+            Preference.PreferenceGroup(
+                title = stringResource(KMR.strings.pref_search_history),
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = uiPreferences.searchHistoryEnabled(),
+                        title = stringResource(KMR.strings.pref_search_history),
+                        subtitle = stringResource(KMR.strings.pref_search_history_summary),
+                    ),
+                ),
+            ),
+            // KMK <--
             Preference.PreferenceGroup(
                 title = stringResource(MR.strings.label_sources),
                 preferenceItems = persistentListOf(

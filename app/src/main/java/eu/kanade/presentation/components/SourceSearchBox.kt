@@ -43,9 +43,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import tachiyomi.i18n.MR
+import eu.kanade.domain.ui.UiPreferences
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.clearFocusOnSoftKeyboardHide
+import tachiyomi.presentation.core.util.collectAsState
 import tachiyomi.presentation.core.util.isItemScrollingUp
 import tachiyomi.presentation.core.util.runOnEnterKeyPressed
 import tachiyomi.presentation.core.util.secondaryItemAlpha
@@ -104,6 +106,9 @@ fun SourcesSearchBox(
     keyboardController: SoftwareKeyboardController? = LocalSoftwareKeyboardController.current,
 ) {
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    val uiPreferences = remember { Injekt.get<UiPreferences>() }
+    val searchHistoryEnabled by uiPreferences.searchHistoryEnabled().collectAsState()
+
     val getSearchHistory: GetSearchHistory = remember { Injekt.get() }
     val upsertSearchHistory: UpsertSearchHistory = remember { Injekt.get() }
     val deleteSearchHistory: DeleteSearchHistory = remember { Injekt.get() }
@@ -112,7 +117,7 @@ fun SourcesSearchBox(
         initialValue = emptyList(),
         key1 = searchHistoryScope,
     ) {
-        if (!searchHistoryScope.isNullOrBlank()) {
+        if (!searchHistoryScope.isNullOrBlank() && searchHistoryEnabled) {
             getSearchHistory.subscribe(searchHistoryScope).collect { value = it }
         } else {
             value = emptyList()
@@ -121,7 +126,7 @@ fun SourcesSearchBox(
 
     val searchAndClearFocus: () -> Unit = f@{
         if (searchQuery.isNullOrBlank()) return@f
-        if (!searchHistoryScope.isNullOrBlank()) {
+        if (!searchHistoryScope.isNullOrBlank() && searchHistoryEnabled) {
             coroutineScope.launch(Dispatchers.IO) {
                 upsertSearchHistory.await(searchHistoryScope, searchQuery.trim())
             }
@@ -204,12 +209,12 @@ fun SourcesSearchBox(
             },
         )
 
-        if (!searchHistoryScope.isNullOrBlank() && historyList.isNotEmpty() && (isFocused || !searchQuery.isNullOrBlank())) {
+        if (!searchHistoryScope.isNullOrBlank() && searchHistoryEnabled && historyList.isNotEmpty() && (isFocused || !searchQuery.isNullOrBlank())) {
             SearchHistoryRow(
                 historyList = historyList,
                 onSelectQuery = { selectedQuery ->
                     onChangeSearchQuery(selectedQuery)
-                    if (!searchHistoryScope.isNullOrBlank()) {
+                    if (!searchHistoryScope.isNullOrBlank() && searchHistoryEnabled) {
                         coroutineScope.launch(Dispatchers.IO) {
                             upsertSearchHistory.await(searchHistoryScope, selectedQuery)
                         }
@@ -217,14 +222,14 @@ fun SourcesSearchBox(
                     searchAndClearFocus()
                 },
                 onDeleteQuery = { queryToDelete ->
-                    if (!searchHistoryScope.isNullOrBlank()) {
+                    if (!searchHistoryScope.isNullOrBlank() && searchHistoryEnabled) {
                         coroutineScope.launch(Dispatchers.IO) {
                             deleteSearchHistory.await(searchHistoryScope, queryToDelete)
                         }
                     }
                 },
                 onClearAll = {
-                    if (!searchHistoryScope.isNullOrBlank()) {
+                    if (!searchHistoryScope.isNullOrBlank() && searchHistoryEnabled) {
                         coroutineScope.launch(Dispatchers.IO) {
                             deleteSearchHistory.clearScope(searchHistoryScope)
                         }
