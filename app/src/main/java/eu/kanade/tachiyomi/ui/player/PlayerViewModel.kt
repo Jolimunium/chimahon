@@ -569,6 +569,7 @@ class PlayerViewModel @JvmOverloads constructor(
 
     sealed interface JimakuState {
         data object Idle : JimakuState
+        data object ApiKeyRequired : JimakuState
         data class Searching(val title: String) : JimakuState
         data class EntryResults(val title: String, val entries: List<JimakuEntry>) : JimakuState
         data class LoadingFiles(val entry: JimakuEntry) : JimakuState
@@ -672,6 +673,15 @@ class PlayerViewModel @JvmOverloads constructor(
         subtitlePreferences.jimakuTitleForAnime(currentAnime.value?.id).set(title.trim())
     }
 
+    fun saveJimakuApiKeyAndSearch(apiKey: String) {
+        val trimmedApiKey = apiKey.trim()
+        if (trimmedApiKey.isBlank()) return
+
+        subtitlePreferences.jimakuApiKey().set(trimmedApiKey)
+        _jimakuState.update { JimakuState.Idle }
+        searchJimakuSubtitles()
+    }
+
     fun getCurrentJimakuTitle(): String {
         return guessCurrentJimakuMedia().title
     }
@@ -681,7 +691,7 @@ class PlayerViewModel @JvmOverloads constructor(
 
         val apiKey = subtitlePreferences.jimakuApiKey().get().trim()
         if (apiKey.isBlank()) {
-            activity.toast("Add your Jimaku API key in player subtitle settings first")
+            _jimakuState.update { JimakuState.ApiKeyRequired }
             return
         }
 

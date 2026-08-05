@@ -725,6 +725,7 @@ fun PlayerControls(
             onAddSubtitle = viewModel::addSubtitle,
             onSelectSubtitle = viewModel::selectSub,
             onSearchJimaku = viewModel::searchJimakuSubtitles,
+            onSaveJimakuApiKeyAndSearch = viewModel::saveJimakuApiKeyAndSearch,
             onSelectJimakuEntry = viewModel::loadJimakuFiles,
             onSelectJimakuFile = viewModel::downloadJimakuSubtitle,
             onDismissJimaku = viewModel::dismissJimakuDialog,
