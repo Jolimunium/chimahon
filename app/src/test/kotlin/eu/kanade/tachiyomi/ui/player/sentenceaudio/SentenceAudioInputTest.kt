@@ -26,14 +26,37 @@ class SentenceAudioInputTest {
     }
 
     @Test
-    fun `sensitive request metadata and signed URLs are rejected`() {
+    fun `sensitive request metadata and credential query parameters are rejected`() {
         listOf(
             snapshot("https://media.example/video.mp4", headers = listOf("Authorization" to "Bearer secret")),
             snapshot("https://media.example/video.mp4?access_token=secret"),
-            snapshot("https://media.example/video.mp4?signature=secret"),
-            snapshot("https://media.example/video.mp4?x-amz-signature=secret"),
+            snapshot("https://media.example/video.mp4?api_key=secret"),
             snapshot("https://user:password@media.example/video.mp4"),
         ).forEach { assertNull(resolve(it)) }
+    }
+
+    @Test
+    fun `media URL signature parameters like sig and lsig are supported only for HTTPS YouTube CDN`() {
+        val inputSig = resolve(snapshot("https://googlevideo.com/videoplayback?expire=123&sig=signatureValue&id=abc"))
+        val inputLsig = resolve(snapshot("https://googlevideo.com/videoplayback?expire=123&lsig=signatureValue&id=abc"))
+        assertNotNull(inputSig)
+        assertNotNull(inputLsig)
+        assertEquals(SentenceAudioInputKind.REMOTE_HTTP, inputSig?.kind)
+        assertEquals(SentenceAudioInputKind.REMOTE_HTTP, inputLsig?.kind)
+        assertNull(resolve(snapshot("http://googlevideo.com/videoplayback?expire=123&sig=signatureValue&id=abc")))
+        assertNull(resolve(snapshot("http://googlevideo.com/videoplayback?expire=123&lsig=signatureValue&id=abc")))
+        assertNull(resolve(snapshot("https://media.example/video.mp4?sig=signatureValue")))
+    }
+
+    @Test
+    fun `sanitizeForLog redacts sensitive tokens including sig and lsig and preserves path`() {
+        val url = "https://googlevideo.com/videoplayback?expire=123&sig=secretKey123&lsig=secretLsig456&id=abc"
+        val sanitized = SentenceAudioInputResolver.sanitizeForLog(url)
+        assertTrue(sanitized.contains("expire=123"))
+        assertTrue(sanitized.contains("sig=[REDACTED]"))
+        assertTrue(sanitized.contains("lsig=[REDACTED]"))
+        assertFalse(sanitized.contains("secretKey123"))
+        assertFalse(sanitized.contains("secretLsig456"))
     }
 
     @Test
@@ -52,7 +75,10 @@ class SentenceAudioInputTest {
     fun `resolved inputs retain whether export uses original playable or external audio`() {
         assertEquals(SentenceAudioInputOrigin.ORIGINAL_VIDEO, requireNotNull(resolve(snapshot("/video/original.mkv", playableValue = "/video/playable.mkv"))).origin)
         assertEquals(SentenceAudioInputOrigin.PLAYABLE_VIDEO, requireNotNull(resolve(snapshot("", playableValue = "/video/playable.mkv"))).origin)
-        assertEquals(SentenceAudioInputOrigin.EXTERNAL_AUDIO, requireNotNull(resolve(snapshot("/audio/episode.m4a", selectedAudioIsExternal = true))).origin)
+        assertEquals(SentenceAudioInputOrigin.EXTERNAL_AUDIO, requireNotNull(resolve(snapshot("/video/original.mkv", selectedAudioIsExternal = true, selectedExternalAudioValue = "/audio/external.m4a"))).origin)
+        val fallbackSpec = requireNotNull(resolve(snapshot("/video/original.mkv", selectedAudioIsExternal = true, selectedExternalAudioValue = null, selectedAudioFfmpegIndex = 2)))
+        assertEquals(SentenceAudioInputOrigin.ORIGINAL_VIDEO, fallbackSpec.origin)
+        assertNull(fallbackSpec.audioStreamIndex)
     }
 
     @Test

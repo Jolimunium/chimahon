@@ -45,22 +45,56 @@ class SentenceAudioCaptureServiceTest {
     }
 
     @Test
-    fun `does not retry external audio after its probe fails`() = runTest {
-        val executor = FakeExecutor(selected = listOf(SentenceAudioCommandResult.Failed))
-        val result = service(executor).prepare(request(external = true, externalValue = "https://media.example/audio.m4a", playable = "https://media.example/playable.mp4"))
-        assertFailure(AnkiSentenceAudioFailure.AUDIO_PROBE_FAILED, result)
-        assertEquals(1, executor.probeInputs.size)
+    fun `falls back to original video when external audio probe fails`() = runTest {
+        val executor = FakeExecutor(
+            selected = listOf(SentenceAudioCommandResult.Failed, SentenceAudioCommandResult.Failed, SentenceAudioCommandResult.Success(selectedAudio)),
+        )
+        val result = service(executor).prepare(request(index = 8, external = true, externalValue = "https://media.example/audio.m4a", playable = "https://media.example/playable.mp4"))
+        assertType<AnkiSentenceAudioPreparation.Ready>(result)
+        assertEquals(listOf("https://media.example/audio.m4a", "https://media.example/audio.m4a", "https://media.example/original.mp4"), executor.probeInputs)
+        assertEquals(listOf("8", "a:0", "a:0"), executor.probeSelectors)
     }
 
     @Test
     fun `does not retry playable input after extraction failure`() = runTest {
         val executor = FakeExecutor(
             selected = listOf(SentenceAudioCommandResult.Success(selectedAudio)),
-            ffmpeg = SentenceAudioCommandResult.FfmpegFailed(SentenceAudioFfmpegFailure.SOURCE_READ),
+            ffmpeg = listOf(SentenceAudioCommandResult.FfmpegFailed(SentenceAudioFfmpegFailure.SOURCE_READ)),
         )
         val result = service(executor).prepare(request(playable = "https://media.example/playable.mp4"))
         assertFailure(AnkiSentenceAudioFailure.EXTRACTION_SOURCE_READ_FAILED, result)
         assertEquals(1, executor.probeInputs.size)
+        assertEquals(1, executor.ffmpegCalls)
+    }
+
+    @Test
+    fun `retries unindexed extraction after stream mapping failure only when single audio stream exists`() = runTest {
+        val executor = FakeExecutor(
+            selected = listOf(SentenceAudioCommandResult.Success(selectedAudio)),
+            all = listOf(SentenceAudioCommandResult.Success("[STREAM]\nindex=0\ncodec_type=audio\n[/STREAM]")),
+            ffmpeg = listOf(
+                SentenceAudioCommandResult.FfmpegFailed(SentenceAudioFfmpegFailure.STREAM_MAPPING),
+                SentenceAudioCommandResult.Success(),
+            ),
+        )
+        val result = service(executor).prepare(request(index = 2))
+        assertType<AnkiSentenceAudioPreparation.Ready>(result)
+        assertEquals(2, executor.ffmpegCalls)
+        assertTrue(executor.ffmpegArguments[0].contains("0:2"))
+        assertTrue(executor.ffmpegArguments[1].contains("0:0"))
+    }
+
+    @Test
+    fun `does not retry unindexed extraction after stream mapping failure when multiple audio streams exist`() = runTest {
+        val executor = FakeExecutor(
+            selected = listOf(SentenceAudioCommandResult.Success(selectedAudio)),
+            all = listOf(SentenceAudioCommandResult.Success("[STREAM]\nindex=1\ncodec_type=audio\n[/STREAM]\n[STREAM]\nindex=2\ncodec_type=audio\n[/STREAM]")),
+            ffmpeg = listOf(
+                SentenceAudioCommandResult.FfmpegFailed(SentenceAudioFfmpegFailure.STREAM_MAPPING),
+            ),
+        )
+        val result = service(executor).prepare(request(index = 2))
+        assertFailure(AnkiSentenceAudioFailure.EXTRACTION_STREAM_MAPPING_FAILED, result)
         assertEquals(1, executor.ffmpegCalls)
     }
 
@@ -102,6 +136,27 @@ class SentenceAudioCaptureServiceTest {
         val executor = FakeExecutor(selected = listOf(SentenceAudioCommandResult.Success("codec_type=video")), all = listOf(SentenceAudioCommandResult.Success("")), discovery = listOf(SentenceAudioCommandResult.Success("")))
         assertType<AnkiSentenceAudioPreparation.Ready>(service(executor).prepare(request(index = 7)))
         assertTrue(executor.ffmpegArguments.single().contains("0:7"))
+    }
+
+    @Test
+    fun `attempts frozen external audio index after empty probes`() = runTest {
+        val executor = FakeExecutor(
+            selected = listOf(SentenceAudioCommandResult.Success("")),
+            all = listOf(SentenceAudioCommandResult.Success("")),
+            discovery = listOf(SentenceAudioCommandResult.Success("")),
+        )
+
+        val result = service(executor).prepare(
+            request(
+                index = 0,
+                external = true,
+                externalValue = "https://media.example/external-audio.webm",
+            ),
+        )
+
+        assertType<AnkiSentenceAudioPreparation.Ready>(result)
+        assertEquals(listOf("https://media.example/external-audio.webm"), executor.probeInputs.distinct())
+        assertTrue(executor.ffmpegArguments.single().contains("0:0"))
     }
 
     @Test
@@ -150,16 +205,17 @@ class SentenceAudioCaptureServiceTest {
         selected: List<SentenceAudioCommandResult> = listOf(SentenceAudioCommandResult.Success(selectedAudio)),
         private val all: List<SentenceAudioCommandResult> = listOf(SentenceAudioCommandResult.Success("")),
         private val discovery: List<SentenceAudioCommandResult> = listOf(SentenceAudioCommandResult.Success("")),
-        private val ffmpeg: SentenceAudioCommandResult = SentenceAudioCommandResult.Success(),
+        ffmpeg: List<SentenceAudioCommandResult> = listOf(SentenceAudioCommandResult.Success()),
         private val writeOutput: Boolean = true,
         private val neverFinish: Boolean = false,
     ) : SentenceAudioCommandExecutor {
         private val selectedQueue = ArrayDeque(selected)
         private val allQueue = ArrayDeque(all)
         private val discoveryQueue = ArrayDeque(discovery)
-        val probeInputs = mutableListOf<String>(); val ffmpegArguments = mutableListOf<List<String>>(); var ffmpegCalls = 0; var allProbeCalls = 0
+        private val ffmpegQueue = ArrayDeque(ffmpeg)
+        val probeInputs = mutableListOf<String>(); val probeSelectors = mutableListOf<String>(); val ffmpegArguments = mutableListOf<List<String>>(); var ffmpegCalls = 0; var allProbeCalls = 0
         override suspend fun executeFfprobe(arguments: Array<String>, onNativeFinished: () -> Unit): SentenceAudioCommandResult {
-            probeInputs += arguments.last(); val selector = arguments[arguments.indexOf("-select_streams") + 1]
+            probeInputs += arguments.last(); val selector = arguments[arguments.indexOf("-select_streams") + 1]; probeSelectors += selector
             val result = when (selector) { "a" -> if ("-codec_whitelist" in arguments) { allProbeCalls++; allQueue.removeFirstOrNull() ?: SentenceAudioCommandResult.Failed } else discoveryQueue.removeFirstOrNull() ?: SentenceAudioCommandResult.Failed; else -> selectedQueue.removeFirstOrNull() ?: SentenceAudioCommandResult.Failed }
             onNativeFinished(); return result
         }
@@ -168,8 +224,9 @@ class SentenceAudioCaptureServiceTest {
             if (neverFinish) return suspendCancellableCoroutine { continuation ->
                 continuation.invokeOnCancellation { onNativeFinished() }
             }
-            if (ffmpeg is SentenceAudioCommandResult.Success && writeOutput) File(arguments.last()).writeBytes(byteArrayOf(1, 2, 3))
-            onNativeFinished(); return ffmpeg
+            val result = ffmpegQueue.removeFirstOrNull() ?: SentenceAudioCommandResult.Failed
+            if (result is SentenceAudioCommandResult.Success && writeOutput) File(arguments.last()).writeBytes(byteArrayOf(1, 2, 3))
+            onNativeFinished(); return result
         }
     }
     private class BlockingExecutor : SentenceAudioCommandExecutor {
