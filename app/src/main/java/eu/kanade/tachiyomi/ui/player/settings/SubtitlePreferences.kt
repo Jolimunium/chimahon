@@ -81,8 +81,21 @@ class SubtitlePreferences(
         ?.takeIf { it > 0 }
         ?.let { preferenceStore.getInt("pref_subtitles_delay_anime_$it", subtitlesDelay().get()) }
         ?: subtitlesDelay()
+    fun subtitlesDelayForEpisode(episodeId: Long?, animeId: Long?) = episodeId
+        ?.takeIf { it > 0 }
+        ?.let {
+            preferenceStore.getInt(
+                "pref_subtitles_delay_episode_$it",
+                subtitlesDelayForAnime(animeId).get(),
+            )
+        }
+        ?: subtitlesDelayForAnime(animeId)
 
     fun subtitlesSpeed() = preferenceStore.getFloat("pref_subtitles_speed", 1f)
+    fun subtitlesSpeedForEpisode(episodeId: Long?) = episodeId
+        ?.takeIf { it > 0 }
+        ?.let { preferenceStore.getFloat("pref_subtitles_speed_episode_$it", subtitlesSpeed().get()) }
+        ?: subtitlesSpeed()
     fun subtitlesSecondaryDelay() = preferenceStore.getInt("pref_subtitles_secondary_delay", 0)
     fun subtitlesSecondaryDelayForAnime(animeId: Long?) = animeId
         ?.takeIf { it > 0 }
@@ -93,6 +106,15 @@ class SubtitlePreferences(
             )
         }
         ?: subtitlesSecondaryDelay()
+    fun subtitlesSecondaryDelayForEpisode(episodeId: Long?, animeId: Long?) = episodeId
+        ?.takeIf { it > 0 }
+        ?.let {
+            preferenceStore.getInt(
+                "pref_subtitles_secondary_delay_episode_$it",
+                subtitlesSecondaryDelayForAnime(animeId).get(),
+            )
+        }
+        ?: subtitlesSecondaryDelayForAnime(animeId)
 
     private companion object {
         const val JIMAKU_API_KEY = "pref_jimaku_api_key"

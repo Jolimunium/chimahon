@@ -2935,14 +2935,15 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     private fun applySubtitleDelayForAnime(animeId: Long) {
-        val primaryDelayMillis = subtitlePreferences.subtitlesDelayForAnime(animeId).get()
+        val episodeId = currentEpisode.value?.id
+        val primaryDelayMillis = subtitlePreferences.subtitlesDelayForEpisode(episodeId, animeId).get()
         MPVLib.setOptionString("sub-delay", (primaryDelayMillis / 1000.0).toString())
         MPVLib.setOptionString(
             "secondary-sub-delay",
-            (subtitlePreferences.subtitlesSecondaryDelayForAnime(animeId).get() / 1000.0).toString(),
+            (subtitlePreferences.subtitlesSecondaryDelayForEpisode(episodeId, animeId).get() / 1000.0).toString(),
         )
         updatePrimarySubtitleDelayMillis(primaryDelayMillis)
-        updateSubtitleSpeed(subtitlePreferences.subtitlesSpeed().get().toDouble())
+        updateSubtitleSpeed(subtitlePreferences.subtitlesSpeedForEpisode(episodeId).get().toDouble())
     }
 
     /**

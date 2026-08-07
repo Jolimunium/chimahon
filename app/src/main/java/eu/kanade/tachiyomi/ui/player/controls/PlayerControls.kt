@@ -705,6 +705,7 @@ fun PlayerControls(
         val selectedSubtitles by viewModel.selectedSubtitles.collectAsState()
         val jimakuState by viewModel.jimakuState.collectAsState()
         val anime by viewModel.currentAnime.collectAsState()
+        val currentEpisode by viewModel.currentEpisode.collectAsState()
         val jimakuTitle by subtitlePreferences.jimakuTitleForAnime(anime?.id).collectAsState()
         val audioTracks by viewModel.audioTracks.collectAsState()
         val selectedAudio by viewModel.selectedAudio.collectAsState()
@@ -783,6 +784,7 @@ fun PlayerControls(
             subtitleCues = subtitleCues.toImmutableList(),
             activeSubtitleCueIndex = activeSubtitleCueIndex,
             animeId = anime?.id,
+            episodeId = currentEpisode?.id,
             onSelectSubtitleCue = viewModel::selectSubtitleCue,
             onPrimarySubtitleDelayMillisChange = viewModel::updatePrimarySubtitleDelayMillis,
             onSubtitleSpeedChange = viewModel::updateSubtitleSpeed,
