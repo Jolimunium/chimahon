@@ -243,6 +243,8 @@ class PlayerViewModel @JvmOverloads constructor(
     val jimakuState = _jimakuState.asStateFlow()
     private val _currentSubtitleText = MutableStateFlow("")
     val currentSubtitleText = _currentSubtitleText.asStateFlow()
+    private val _secondaryCurrentSubtitleText = MutableStateFlow("")
+    val secondaryCurrentSubtitleText = _secondaryCurrentSubtitleText.asStateFlow()
     private val _subtitlesVisible = MutableStateFlow(true)
     val subtitlesVisible = _subtitlesVisible.asStateFlow()
     private val _subtitleHistory = MutableStateFlow<List<SubtitleCue>>(emptyList())
@@ -1051,6 +1053,7 @@ class PlayerViewModel @JvmOverloads constructor(
             lastSubtitleHistoryText = ""
             currentRawSubtitleText = ""
             _currentSubtitleText.update { "" }
+            _secondaryCurrentSubtitleText.update { "" }
             _subtitleHistory.update { emptyList() }
             _activeSubtitleCueIndex.update { null }
             return
@@ -1342,6 +1345,11 @@ class PlayerViewModel @JvmOverloads constructor(
             return
         }
         updateSubtitleHistory(cleaned, effectiveText)
+    }
+
+    fun updateSecondarySubtitleText(text: String?) {
+        val cleaned = text.orEmpty().cleanMpvSubtitleText()
+        _secondaryCurrentSubtitleText.update { cleaned.toEffectiveSubtitleText() }
     }
 
     private fun updateSubtitleHistory(rawText: String, text: String) {

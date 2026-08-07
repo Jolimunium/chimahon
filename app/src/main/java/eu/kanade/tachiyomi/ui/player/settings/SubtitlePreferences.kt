@@ -76,8 +76,6 @@ class SubtitlePreferences(
     fun subtitleJustification() = preferenceStore.getEnum("pref_sub_justify", SubtitleJustification.Auto)
     fun subtitlePos() = preferenceStore.getInt("pref_sub_pos", 100)
 
-    fun overrideSubsASS() = preferenceStore.getBoolean("pref_override_subtitles_ass", false)
-
     fun subtitlesDelay() = preferenceStore.getInt("pref_subtitles_delay", 0)
     fun subtitlesDelayForAnime(animeId: Long?) = animeId
         ?.takeIf { it > 0 }

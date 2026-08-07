@@ -101,7 +101,6 @@ import eu.kanade.tachiyomi.ui.player.controls.components.SeekbarWithTimers
 import eu.kanade.tachiyomi.ui.player.controls.components.TextPlayerUpdate
 import eu.kanade.tachiyomi.ui.player.controls.components.VolumeSlider
 import eu.kanade.tachiyomi.ui.player.controls.components.panels.SubtitlesBorderStyle
-import eu.kanade.tachiyomi.ui.player.controls.components.panels.toColorHexString
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.toFixed
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
@@ -156,6 +155,7 @@ fun PlayerControls(
     val chapters by viewModel.chapters.collectAsState()
     val currentBrightness by viewModel.currentBrightness.collectAsState()
     val currentSubtitleText by viewModel.currentSubtitleText.collectAsState()
+    val secondaryCurrentSubtitleText by viewModel.secondaryCurrentSubtitleText.collectAsState()
     val subtitlesVisible by viewModel.subtitlesVisible.collectAsState()
     val subtitleCues by viewModel.subtitleHistory.collectAsState()
     val activeSubtitleCueIndex by viewModel.activeSubtitleCueIndex.collectAsState()
@@ -259,6 +259,10 @@ fun PlayerControls(
             subtitleDelaySeconds = primarySubtitleDelaySeconds,
             request = subtitleLookupRequest,
             onLookup = openSubtitleLookup,
+        )
+        PlayerSubtitleTextLayer(
+            text = if (subtitlesVisible) secondaryCurrentSubtitleText else "",
+            topAligned = true,
         )
     }
     DoubleTapToSeekOvals(doubleTapSeekAmount, seekText, interactionSource)
@@ -844,11 +848,12 @@ fun PlayerControls(
 @Composable
 private fun PlayerSubtitleTextLayer(
     text: String,
-    cue: PlayerViewModel.SubtitleCue?,
-    subtitleDelaySeconds: Double,
-    request: SubtitleLookupRequest?,
-    onLookup: (SubtitleLookupSelection) -> Unit,
+    cue: PlayerViewModel.SubtitleCue? = null,
+    subtitleDelaySeconds: Double = 0.0,
+    request: SubtitleLookupRequest? = null,
+    onLookup: (SubtitleLookupSelection) -> Unit = {},
     modifier: Modifier = Modifier,
+    topAligned: Boolean = false,
     bottomPadding: Dp? = null,
     widthFraction: Float = 0.92f,
     maxWidth: Dp = 980.dp,
@@ -859,7 +864,6 @@ private fun PlayerSubtitleTextLayer(
     val subtitleText = remember(text) {
         text.lines()
             .map { it.trim().collapseHorizontalWhitespace() }
-            .filter { it.hasLookupCharacters() }
             .joinToString("\n")
     }
 
@@ -874,18 +878,6 @@ private fun PlayerSubtitleTextLayer(
     val borderSize by subtitlePreferences.subtitleBorderSize().collectAsState()
     val bold by subtitlePreferences.boldSubtitles().collectAsState()
     val italic by subtitlePreferences.italicSubtitles().collectAsState()
-
-    LaunchedEffect(subtitleText.isNotBlank(), textColor, borderColor, backgroundColor) {
-        if (subtitleText.isNotBlank()) {
-            MPVLib.setPropertyString("sub-color", "#00FFFFFF")
-            MPVLib.setPropertyString("sub-border-color", "#00000000")
-            MPVLib.setPropertyString("sub-back-color", "#00000000")
-        } else {
-            MPVLib.setPropertyString("sub-color", textColor.toColorHexString())
-            MPVLib.setPropertyString("sub-border-color", borderColor.toColorHexString())
-            MPVLib.setPropertyString("sub-back-color", backgroundColor.toColorHexString())
-        }
-    }
 
     if (subtitleText.isBlank()) return
 
@@ -918,8 +910,14 @@ private fun PlayerSubtitleTextLayer(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 24.dp)
-            .padding(bottom = resolvedBottomPadding),
-        contentAlignment = Alignment.BottomCenter,
+            .then(
+                if (topAligned) {
+                    Modifier.padding(top = 24.dp)
+                } else {
+                    Modifier.padding(bottom = resolvedBottomPadding)
+                },
+            ),
+        contentAlignment = if (topAligned) Alignment.TopCenter else Alignment.BottomCenter,
     ) {
         Box(
             modifier = Modifier
@@ -1027,8 +1025,6 @@ private data class SubtitleLookupSelection(
     val cueStartSeconds: Double? = null,
     val cueEndSeconds: Double? = null,
 )
-
-private fun String.hasLookupCharacters(): Boolean = any { it.isSubtitleLookupChar() }
 
 private fun TextLayoutResult.subtitleLookupSelectionForTap(
     text: String,

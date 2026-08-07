@@ -261,6 +261,7 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet) : BaseMPVView(c
         "sid" to MPVLib.mpvFormat.MPV_FORMAT_STRING,
         "secondary-sid" to MPVLib.mpvFormat.MPV_FORMAT_STRING,
         "sub-text" to MPVLib.mpvFormat.MPV_FORMAT_STRING,
+        "secondary-sub-text" to MPVLib.mpvFormat.MPV_FORMAT_STRING,
         "aid" to MPVLib.mpvFormat.MPV_FORMAT_STRING,
 
         "speed" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE,
@@ -308,10 +309,11 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet) : BaseMPVView(c
         )
 
         MPVLib.setOptionString("sub-font", subtitlePreferences.subtitleFont().get())
-        if (subtitlePreferences.overrideSubsASS().get()) {
-            MPVLib.setOptionString("sub-ass-override", "force")
-            MPVLib.setOptionString("sub-ass-justify", "yes")
-        }
+        // Force-apply mpv's subtitle styling options to ASS so the sub-* options take effect.
+        // Without this, libass renders ASS with the script's own colors/effects, which would
+        // double-render alongside the Compose overlay. Text is drawn by Compose below.
+        MPVLib.setOptionString("sub-ass-override", "force")
+        MPVLib.setOptionString("sub-ass-justify", "yes")
         MPVLib.setOptionString("sub-font-size", subtitlePreferences.subtitleFontSize().get().toString())
         MPVLib.setOptionString("sub-bold", if (subtitlePreferences.boldSubtitles().get()) "yes" else "no")
         MPVLib.setOptionString("sub-italic", if (subtitlePreferences.italicSubtitles().get()) "yes" else "no")
