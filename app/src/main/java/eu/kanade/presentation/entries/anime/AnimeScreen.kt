@@ -610,7 +610,9 @@ private fun AnimeScreenSmallImpl(
                         state.anime.source != MERGED_SOURCE_ID
                     ) {
                         if (expandRelatedAnime && state.relatedAnimeSorted?.isNotEmpty() != false) {
-                            item {
+                            item(
+                                span = { GridItemSpan(maxLineSpan) },
+                            ) {
                                 HorizontalDivider(modifier = Modifier.ignorePadding(offsetGridPaddingPx))
                             }
                             item(
@@ -623,7 +625,9 @@ private fun AnimeScreenSmallImpl(
                                     modifier = Modifier.ignorePadding(offsetGridPaddingPx),
                                 )
                             }
-                            item {
+                            item(
+                                span = { GridItemSpan(maxLineSpan) },
+                            ) {
                                 HorizontalDivider(modifier = Modifier.ignorePadding(offsetGridPaddingPx))
                             }
                         } else if (!expandRelatedAnime && !showRelatedAnimeInOverflow) {
@@ -1026,7 +1030,9 @@ fun AnimeScreenLargeImpl(
                                 state.anime.source != MERGED_SOURCE_ID
                             ) {
                                 if (expandRelatedAnime && state.relatedAnimeSorted?.isNotEmpty() != false) {
-                                    item {
+                                    item(
+                                        span = { GridItemSpan(maxLineSpan) },
+                                    ) {
                                         HorizontalDivider(modifier = Modifier.ignorePadding(offsetGridPaddingPx))
                                     }
                                     item(
@@ -1039,7 +1045,9 @@ fun AnimeScreenLargeImpl(
                                             modifier = Modifier.ignorePadding(offsetGridPaddingPx),
                                         )
                                     }
-                                    item {
+                                    item(
+                                        span = { GridItemSpan(maxLineSpan) },
+                                    ) {
                                         HorizontalDivider(modifier = Modifier.ignorePadding(offsetGridPaddingPx))
                                     }
                                 } else if (!expandRelatedAnime && !showRelatedAnimeInOverflow) {
