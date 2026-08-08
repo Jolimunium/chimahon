@@ -496,6 +496,7 @@ class PagerPageHolder(
         ocrBoxScaleX = viewer.activity.viewModel.getOcrBoxScaleX()
         ocrBoxScaleY = viewer.activity.viewModel.getOcrBoxScaleY()
         ocrBoxOpacity = viewer.activity.viewModel.getOcrBoxOpacity()
+        ocrScanResolution = viewer.activity.viewModel.getOcrScanResolution()
         val ocrEnabled = viewer.activity.viewModel.isOcrEnabled()
         this.ocrEnabled = ocrEnabled
         if (!ocrEnabled) {
@@ -514,6 +515,7 @@ class PagerPageHolder(
         ocrBoxScaleX = viewer.activity.viewModel.getOcrBoxScaleX()
         ocrBoxScaleY = viewer.activity.viewModel.getOcrBoxScaleY()
         ocrBoxOpacity = viewer.activity.viewModel.getOcrBoxOpacity()
+        ocrScanResolution = viewer.activity.viewModel.getOcrScanResolution()
         ocrEnabled = enabled
         if (!enabled) {
             ocrLoadJob?.cancel()

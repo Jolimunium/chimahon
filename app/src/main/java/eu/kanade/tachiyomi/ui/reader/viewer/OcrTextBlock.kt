@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.ui.reader.viewer
 
 import chimahon.ocr.extractOcrLookupText
+import chimahon.ocr.extractWholeWord
 import chimahon.ocr.isOcrLookupStartChar
 
 /**
@@ -150,6 +151,30 @@ internal fun isLookupStartChar(char: Char): Boolean {
 
 internal fun extractOcrLookupString(text: String, start: Int): String {
     return extractOcrLookupText(text, start)
+}
+
+/**
+ * Lookup string for the tap at [global] offset of the block. When [wholeWord]
+ * is true the tap position expands to the full surrounding word, clamped so it
+ * never crosses into a neighboring OCR line (block text concatenates lines
+ * without a separator).
+ */
+internal fun OcrTextBlock.extractLookupString(global: Int, wholeWord: Boolean): String {
+    if (!wholeWord) return extractOcrLookupText(fullText, global)
+    val (lineStart, lineEnd) = lineBoundariesFor(global)
+    return extractWholeWord(fullText, global, lineStart, lineEnd)
+}
+
+/** [start, end) range of the line containing [offset] within [fullText]. */
+internal fun OcrTextBlock.lineBoundariesFor(offset: Int): Pair<Int, Int> {
+    if (lines.isEmpty()) return 0 to 0
+    var lineStart = 0
+    for (line in lines) {
+        val lineEnd = lineStart + line.length
+        if (offset < lineEnd) return lineStart to lineEnd
+        lineStart = lineEnd
+    }
+    return lineStart to fullText.length
 }
 
 internal fun uniformCharOffset(

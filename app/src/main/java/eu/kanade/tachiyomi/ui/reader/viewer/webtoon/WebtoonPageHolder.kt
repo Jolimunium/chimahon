@@ -302,6 +302,7 @@ class WebtoonPageHolder(
         frame.ocrBoxScaleX = viewer.activity.viewModel.getOcrBoxScaleX()
         frame.ocrBoxScaleY = viewer.activity.viewModel.getOcrBoxScaleY()
         frame.ocrBoxOpacity = viewer.activity.viewModel.getOcrBoxOpacity()
+        frame.ocrScanResolution = viewer.activity.viewModel.getOcrScanResolution()
         frame.ocrEnabled = enabled
         if (!enabled) {
             ocrLoadJob?.cancel()

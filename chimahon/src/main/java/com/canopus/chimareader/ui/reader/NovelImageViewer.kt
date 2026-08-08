@@ -58,7 +58,9 @@ import chimahon.ocr.OcrLanguage
 import chimahon.ocr.OcrResult
 import chimahon.ocr.OcrTextOverlayPainter
 import chimahon.ocr.extractOcrLookupText
+import chimahon.ocr.extractWholeWord
 import chimahon.ocr.isOcrLookupStartChar
+import chimahon.ocr.shouldScanWholeWord
 import coil3.asDrawable
 import coil3.imageLoader
 import coil3.request.CachePolicy
@@ -131,6 +133,7 @@ fun NovelImageViewer(
     imageUri: String,
     readerBackgroundColor: Int,
     ocrLanguage: OcrLanguage = OcrLanguage.JAPANESE,
+    ocrScanResolution: String = "",
     recognizeImage: suspend (Bitmap, OcrLanguage) -> List<OcrResult> = { _, _ -> emptyList() },
     onOcrLookupRequested: (String, String, Int, Float, Float, Float, Float, Boolean, Bitmap) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
     isPopupActive: Boolean = false,
@@ -159,6 +162,7 @@ fun NovelImageViewer(
             factory = { ctx ->
                 NovelImageView(ctx).apply {
                     imageView = this
+                    scanWholeWord = shouldScanWholeWord(ocrScanResolution, ocrLanguage.bcp47)
                     onViewClicked = onDismiss
                     onImageLongPressed = { x, y ->
                         menuPosition = IntOffset(x.roundToInt(), y.roundToInt())
@@ -344,6 +348,11 @@ private class NovelImageView(context: Context) : FrameLayout(context) {
     var onLoadComplete: ((Boolean) -> Unit)? = null
     var onImageLongPressed: ((Float, Float) -> Unit)? = null
     var onOcrLookup: ((String, String, Int, Float, Float, Float, Float, Boolean, Bitmap) -> Unit)? = null
+    var scanWholeWord: Boolean = false
+        set(value) {
+            field = value
+            ssiv.scanWholeWord = value
+        }
     var isPopupActive: Boolean = false
     var onDismissPopup: (() -> Unit)? = null
 
@@ -474,6 +483,7 @@ private class NovelImageView(context: Context) : FrameLayout(context) {
 
 private class NovelSubsamplingImageView(context: Context) : SubsamplingScaleImageView(context) {
     private var ocrBlocks: List<NovelOcrBlock> = emptyList()
+    var scanWholeWord: Boolean = false
     private val density = resources.displayMetrics.density
     private val boxFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
@@ -593,7 +603,12 @@ private class NovelSubsamplingImageView(context: Context) : SubsamplingScaleImag
         if (hit.lineOffset !in target.line.text.indices ||
             !isOcrLookupStartChar(target.line.text[hit.lineOffset])
         ) return null
-        val lookupText = extractOcrLookupText(target.line.text, hit.lineOffset)
+        val lookupText = if (scanWholeWord) {
+            val line = target.line.text
+            extractWholeWord(line, hit.lineOffset, 0, line.length)
+        } else {
+            extractOcrLookupText(target.line.text, hit.lineOffset)
+        }
         if (lookupText.isBlank()) return null
         val rect = target.rect
         val location = IntArray(2)

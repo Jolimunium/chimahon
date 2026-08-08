@@ -42,6 +42,22 @@ data class AnkiProfile(
      * Empty string means "any / not language-specific".
      */
     val languageCode: String = "",
+
+    /**
+     * OCR scan resolution (yomitan "scanning.scanResolution"). Controls whether
+     * the tapped position expands to the whole word ("word", default for
+     * space-delimited languages) or stays character-based ("character", default
+     * for CJK). Empty means auto-derive from [languageCode].
+     */
+    val scanResolution: String = "",
+
+    /**
+     * Lookup search resolution (yomitan "translation.searchResolution"). When
+     * no dictionary entry matches the full source, "word" retries cutting at
+     * word boundaries while "letter" retries one character at a time.
+     * Empty means auto (derive from [languageCode]).
+     */
+    val searchResolution: String = "",
 ) {
 
     fun toJson(): JSONObject = JSONObject().apply {
@@ -63,6 +79,8 @@ data class AnkiProfile(
         put("dictionaryCollapseMode", dictionaryCollapseMode)
         put("dictionaryDisplayModes", JSONObject(dictionaryDisplayModes))
         put("languageCode", languageCode)
+        put("scanResolution", scanResolution)
+        put("searchResolution", searchResolution)
     }
 
     companion object {
@@ -75,6 +93,14 @@ data class AnkiProfile(
         const val DICTIONARY_DISPLAY_ALWAYS_EXPANDED = "always_expanded"
         const val DICTIONARY_DISPLAY_FALLBACK = "fallback"
         const val DICTIONARY_DISPLAY_ALWAYS_COLLAPSED = "always_collapsed"
+
+        const val SCAN_RESOLUTION_AUTO = ""
+        const val SCAN_RESOLUTION_CHARACTER = "character"
+        const val SCAN_RESOLUTION_WORD = "word"
+
+        const val SEARCH_RESOLUTION_AUTO = ""
+        const val SEARCH_RESOLUTION_LETTER = "letter"
+        const val SEARCH_RESOLUTION_WORD = "word"
 
         fun fromJson(json: JSONObject): AnkiProfile = AnkiProfile(
             id = json.getString("id"),
@@ -116,6 +142,8 @@ data class AnkiProfile(
                 }
                 ?: emptyMap(),
             languageCode = json.optString("languageCode", ""),
+            scanResolution = json.optString("scanResolution", ""),
+            searchResolution = json.optString("searchResolution", ""),
         )
 
         /**

@@ -134,6 +134,52 @@ import kotlin.math.roundToInt
 
 private const val TAG = "DictionaryImport"
 
+@Composable
+private fun ProfileResolutionDropdown(
+    label: String,
+    resolvedName: String,
+    entries: List<Pair<String, String>>,
+    onSelect: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = Modifier.padding(top = 8.dp)) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("$label: ${resolvedName}")
+            Icon(Icons.Outlined.KeyboardArrowDown, null)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            entries.forEach { (value, name) ->
+                DropdownMenuItem(
+                    text = { Text(name) },
+                    onClick = { onSelect(value); expanded = false },
+                )
+            }
+        }
+    }
+}
+
+private fun scanResolutionName(stored: String): String {
+    return when (stored) {
+        AnkiProfile.SCAN_RESOLUTION_WORD -> "Word"
+        AnkiProfile.SCAN_RESOLUTION_CHARACTER -> "Character"
+        else -> "Auto (word for non-CJK)"
+    }
+}
+
+private fun searchResolutionName(stored: String): String {
+    return when (stored) {
+        AnkiProfile.SEARCH_RESOLUTION_WORD -> "Word"
+        AnkiProfile.SEARCH_RESOLUTION_LETTER -> "Letter"
+        else -> "Auto (word for non-CJK)"
+    }
+}
+
 private enum class OcrScaleAxis(val label: String) {
     X("X"),
     Y("Y"),
@@ -1291,6 +1337,33 @@ object SettingsDictionaryScreen : SearchableSettings {
                                     }
                                 }
                             }
+
+                            // Scan/search resolution (yomitan `scanning.scanResolution`
+                            // / `translation.searchResolution`)
+                            ProfileResolutionDropdown(
+                                label = "Scan",
+                                resolvedName = scanResolutionName(activeProfile.scanResolution),
+                                entries = listOf(
+                                    "" to "Auto (word for non-CJK)",
+                                    AnkiProfile.SCAN_RESOLUTION_WORD to "Word",
+                                    AnkiProfile.SCAN_RESOLUTION_CHARACTER to "Character",
+                                ),
+                                onSelect = { value ->
+                                    profileStore.updateProfile(profileStore.getActiveProfile().copy(scanResolution = value))
+                                },
+                            )
+                            ProfileResolutionDropdown(
+                                label = "Search",
+                                resolvedName = searchResolutionName(activeProfile.searchResolution),
+                                entries = listOf(
+                                    "" to "Auto (word for non-CJK)",
+                                    AnkiProfile.SEARCH_RESOLUTION_WORD to "Word",
+                                    AnkiProfile.SEARCH_RESOLUTION_LETTER to "Letter",
+                                ),
+                                onSelect = { value ->
+                                    profileStore.updateProfile(profileStore.getActiveProfile().copy(searchResolution = value))
+                                },
+                            )
                         }
                     }
                 )

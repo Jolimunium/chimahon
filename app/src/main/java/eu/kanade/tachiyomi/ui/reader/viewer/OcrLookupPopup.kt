@@ -62,7 +62,10 @@ import chimahon.MediaInfo
 import chimahon.anki.AnkiCardCreator
 import chimahon.anki.AnkiMediaRequest
 import chimahon.anki.AnkiMediaWarning
+import chimahon.anki.AnkiProfile
 import chimahon.anki.AnkiResult
+import chimahon.ocr.effectiveSearchResolution
+import chimahon.ocr.nextWordBoundarySubstring
 import chimahon.util.ImageEncoder
 import eu.kanade.tachiyomi.ui.dictionary.buildKanjiEntryJson
 import eu.kanade.tachiyomi.ui.dictionary.DictionaryEntryWebView
@@ -403,7 +406,7 @@ fun OcrLookupPopup(
             // internal caching so the stat call is fast.
             val termPaths = getDictionaryPaths(context, activeProfile)
             val result = runCatching {
-                repository.lookup(finalQuery, termPaths, activeProfile.languageCode)
+                lookupWithSearchResolution(repository, finalQuery, termPaths, activeProfile)
             }.getOrElse {
                 chimahon.DictionaryRepository.LookupResult2(
                     results = emptyList(),
@@ -418,7 +421,7 @@ fun OcrLookupPopup(
         } else {
             scope.async(Dispatchers.IO) {
                 val termPaths = getDictionaryPaths(context, activeProfile)
-                repository.lookup(finalQuery, termPaths, activeProfile.languageCode)
+                lookupWithSearchResolution(repository, finalQuery, termPaths, activeProfile)
             }
         }
 
@@ -1340,4 +1343,38 @@ fun OcrLookupPopup(
             titleId = titleId,
         )
     }
+}
+
+/**
+ * Runs [repository.lookup] honoring the profile's effective search resolution.
+ * With "word" resolution (yomitan `translation.searchResolution='word'`), when
+ * a query yields no results it is retried cutting at word boundaries. Returns
+ * the last empty (or first non-empty) result.
+ */
+private fun lookupWithSearchResolution(
+    repository: DictionaryRepository,
+    query: String,
+    termPaths: chimahon.DictionaryPaths,
+    activeProfile: AnkiProfile,
+): chimahon.DictionaryRepository.LookupResult2 {
+    fun lookupOne(text: String) = repository.lookup(text, termPaths, activeProfile.languageCode)
+
+    if (effectiveSearchResolution(activeProfile.searchResolution, activeProfile.languageCode) != AnkiProfile.SEARCH_RESOLUTION_WORD) {
+        return lookupOne(query)
+    }
+
+    var current = query
+    var result = lookupOne(current)
+    var guard = 0
+    while (
+        current.isNotEmpty() &&
+        result.error == null &&
+        result.results.isEmpty() &&
+        guard++ < 8
+    ) {
+        current = nextWordBoundarySubstring(current)
+        if (current.isEmpty()) break
+        result = lookupOne(current)
+    }
+    return result
 }

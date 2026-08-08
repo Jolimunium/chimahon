@@ -28,6 +28,7 @@ import androidx.lifecycle.LifecycleOwner
 import chimahon.DictionaryRepository
 import chimahon.ocr.OcrCharacterLine
 import chimahon.ocr.OcrHitTester
+import chimahon.ocr.shouldScanWholeWord
 import coil3.BitmapImage
 import coil3.asDrawable
 import coil3.dispose
@@ -98,10 +99,12 @@ open class ReaderPageImageView @JvmOverloads constructor(
         }
 
     var ocrOutlineVisible: Boolean = false
-        set(value) {
-            field = value
-            (pageView as? SubsamplingScaleImageView)?.invalidate()
-        }
+
+    /**
+     * Effective OCR scan resolution ("word"/"character") for the active
+     * profile/language. Drives whole-word expansion on tap-lookup.
+     */
+    var ocrScanResolution: String = ""
 
     var ocrBoxScaleX: Float = 1.0f
         set(value) {
@@ -785,7 +788,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
             logcat { "OCR tap ignored on punctuation/non-word char '$tappedChar' at offset=$charOffset" }
             return true
         }
-        val lookupString = extractOcrLookupString(block.fullText, charOffset)
+        val lookupString = block.extractLookupString(charOffset, ocrWholeWordScan(block))
         logcat {
             "OCR tap: lookup offset=$charOffset remainingChars=${lookupString.length} x=$viewX y=$viewY"
         }
@@ -806,6 +809,14 @@ open class ReaderPageImageView @JvmOverloads constructor(
             block.vertical, null, block
         )
         return true
+    }
+
+    /**
+     * Whether the tap lookup for [block] should expand to the whole word, per
+     * the profile's scan resolution (empty = derive from the block's language).
+     */
+    private fun ocrWholeWordScan(block: OcrTextBlock): Boolean {
+        return shouldScanWholeWord(ocrScanResolution, block.language)
     }
 
     /**

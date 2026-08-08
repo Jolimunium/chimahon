@@ -5,6 +5,7 @@ import chimahon.ocr.LensClient
 import chimahon.ocr.OcrCacheManager
 import chimahon.ocr.OcrLanguage
 import chimahon.ocr.OcrResult
+import chimahon.ocr.isOcrAllowedForLanguage
 import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.DownloadProvider

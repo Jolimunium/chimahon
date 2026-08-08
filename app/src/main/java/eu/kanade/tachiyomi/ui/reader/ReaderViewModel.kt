@@ -30,7 +30,8 @@ import eu.kanade.tachiyomi.data.database.models.toDomainChapter
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.DownloadProvider
 import eu.kanade.tachiyomi.data.download.model.Download
-import eu.kanade.tachiyomi.data.ocr.isOcrAllowedForLanguage
+import chimahon.ocr.effectiveScanResolution
+import chimahon.ocr.isOcrAllowedForLanguage
 import eu.kanade.tachiyomi.data.ocr.retryWithBackoff
 import eu.kanade.tachiyomi.data.saver.Image
 import eu.kanade.tachiyomi.data.saver.ImageSaver
@@ -1307,6 +1308,25 @@ class ReaderViewModel @JvmOverloads constructor(
         )
 
         return isOcrAllowedForLanguage(source.lang, profile.languageCode)
+    }
+
+    /**
+     * Effective scan resolution for the resolved dictionary profile. Used by
+     * the OCR viewer to decide whole-word vs character tap expansion.
+     */
+    fun getOcrScanResolution(): String {
+        val profile = resolveOcrProfile()
+        return effectiveScanResolution(profile.scanResolution, profile.languageCode)
+    }
+
+    private fun resolveOcrProfile(): chimahon.anki.AnkiProfile {
+        val currentManga = manga ?: return dictionaryPreferences.profileStore.getActiveProfile()
+        val source = sourceManager.getOrStub(currentManga.source)
+        return dictionaryPreferences.profileResolver.resolve(
+            mangaId = currentManga.id,
+            sourceId = currentManga.source,
+            sourceLang = source.lang,
+        )
     }
 
     fun isOcrOutlineVisible(): Boolean = readerPreferences.ocrOutlineVisible().get()
