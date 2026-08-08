@@ -583,7 +583,7 @@ class OcrManager(
                                     ymin = ymin,
                                     xmax = xmax,
                                     ymax = ymax,
-                                    lines = r.text.split("\n").filter { it.isNotBlank() },
+                                    lines = r.text.split("\n"),
                                     vertical = r.forcedOrientation == "vertical",
                                     lineGeometries = lineGeometries,
                                 )
@@ -623,7 +623,7 @@ class OcrManager(
                                     }
                                 )
                             },
-                            language = OcrLanguage.JAPANESE.bcp47,
+                            language = ocrLang.bcp47,
                         )
                     } catch (e: Exception) {
                         logcat(LogPriority.WARN, e) { "OcrManager: failed to cache OCR for page $pageIndex" }

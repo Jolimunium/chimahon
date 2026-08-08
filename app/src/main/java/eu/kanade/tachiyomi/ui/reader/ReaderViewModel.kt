@@ -2509,7 +2509,7 @@ class ReaderViewModel @JvmOverloads constructor(
                         ymin = ymin,
                         xmax = xmax,
                         ymax = ymax,
-                        lines = result.text.split("\n").filter { it.isNotBlank() },
+                        lines = result.text.split("\n"),
                         vertical = result.forcedOrientation == "vertical",
                         lineGeometries = lineGeometries,
                         language = ocrLang.bcp47,
