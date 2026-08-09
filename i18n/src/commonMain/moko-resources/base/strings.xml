@@ -392,6 +392,13 @@
     <string name="pref_dict_invalid_scale">Enter a number between 50 and 200</string>
     <string name="pref_dict_delete">Delete dictionary</string>
     <string name="pref_dict_order">Dictionary order</string>
+    <string name="pref_dictionary_import">Import dictionaries</string>
+    <string name="pref_dictionary_export">Export dictionaries</string>
+    <string name="pref_dictionary_import_success">Dictionaries imported</string>
+    <string name="pref_dictionary_import_error">Dictionary import failed</string>
+    <string name="pref_dictionary_export_success">Dictionaries exported</string>
+    <string name="pref_dictionary_export_error">Dictionary export failed</string>
+    <string name="pref_dictionary_progress">Working…</string>
     <string name="pref_dict_importing">Importing…</string>
     <string name="pref_dict_recursive_mode">Recursive lookup navigation style</string>
     <string name="pref_dict_recursive_mode_tabs">Tabs</string>
