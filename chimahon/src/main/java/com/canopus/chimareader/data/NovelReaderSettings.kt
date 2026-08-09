@@ -268,6 +268,10 @@ class NovelReaderSettings(private val context: Context, private val namespace: S
         prefs.getSafeInt(keys.EINK_REFRESH_DURATION_MILLIS, 100)
     }
 
+    val einkRefreshDelayMillis: Flow<Int> = dataStore.data.map { prefs ->
+        prefs.getSafeInt(keys.EINK_REFRESH_DELAY_MILLIS, 0)
+    }
+
     val einkRefreshPageInterval: Flow<Int> = dataStore.data.map { prefs ->
         prefs.getSafeInt(keys.EINK_REFRESH_PAGE_INTERVAL, 1)
     }
@@ -553,6 +557,12 @@ class NovelReaderSettings(private val context: Context, private val namespace: S
         }
     }
 
+    suspend fun setEinkRefreshDelayMillis(value: Int) {
+        dataStore.edit { prefs ->
+            prefs[keys.EINK_REFRESH_DELAY_MILLIS] = value
+        }
+    }
+
     suspend fun setEinkRefreshPageInterval(value: Int) {
         dataStore.edit { prefs ->
             prefs[keys.EINK_REFRESH_PAGE_INTERVAL] = value
@@ -608,6 +618,7 @@ class NovelReaderSettings(private val context: Context, private val namespace: S
         val EINK_REFRESH_ON_PAGE_TURN = booleanKey("eink_refresh_on_page_turn")
         val EINK_REFRESH_ON_SCROLL = booleanKey("eink_refresh_on_scroll")
         val EINK_REFRESH_DURATION_MILLIS = intKey("eink_refresh_duration_millis")
+        val EINK_REFRESH_DELAY_MILLIS = intKey("eink_refresh_delay_millis")
         val EINK_REFRESH_PAGE_INTERVAL = intKey("eink_refresh_page_interval")
         val EINK_REFRESH_COLOR = stringKey("eink_refresh_color")
     }

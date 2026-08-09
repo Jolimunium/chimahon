@@ -260,6 +260,7 @@ fun ReaderScreen(
                         EinkRefreshOverlay(
                             hostState = einkRefreshHost,
                             durationMillis = viewModel.einkRefreshDurationMillis,
+                            delayMillis = viewModel.einkRefreshDelayMillis,
                             color = runCatching { EinkRefreshColor.valueOf(viewModel.einkRefreshColor) }
                                 .getOrDefault(EinkRefreshColor.BLACK),
                             interval = viewModel.einkRefreshPageInterval,

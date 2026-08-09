@@ -26,6 +26,7 @@ class DisplayRefreshHost {
 
     internal val flashMillis = readerPreferences.flashDurationMillis()
     internal val flashMode = readerPreferences.flashColor()
+    internal val flashDelayMillisPref = readerPreferences.flashDelayMillis()
 
     internal val flashIntervalPref = readerPreferences.flashPageInterval()
 
@@ -64,6 +65,7 @@ fun DisplayRefreshHost(
     val refreshDuration by hostState.flashMillis.collectAsState()
     val flashMode by hostState.flashMode.collectAsState()
     val flashInterval by hostState.flashIntervalPref.collectAsState()
+    val flashDelay by hostState.flashDelayMillisPref.collectAsState()
 
     var currentColor by remember { mutableStateOf<Color?>(null) }
 
@@ -72,6 +74,8 @@ fun DisplayRefreshHost(
             currentColor = null
             return@LaunchedEffect
         }
+
+        delay(flashDelay.milliseconds)
 
         val refreshDurationHalf = refreshDuration.milliseconds / 2
         currentColor = if (flashMode == ReaderPreferences.FlashColor.BLACK) {

@@ -30,6 +30,8 @@ class ReaderPreferences(
 
     fun flashDurationMillis() = preferenceStore.getInt("pref_reader_flash_duration", MILLI_CONVERSION)
 
+    fun flashDelayMillis() = preferenceStore.getInt("pref_reader_flash_delay", 0)
+
     fun flashPageInterval() = preferenceStore.getInt("pref_reader_flash_interval", 1)
 
     fun flashColor() = preferenceStore.getEnum("pref_reader_flash_mode", FlashColor.BLACK)

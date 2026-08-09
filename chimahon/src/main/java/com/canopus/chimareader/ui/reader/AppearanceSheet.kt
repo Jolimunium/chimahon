@@ -588,22 +588,39 @@ fun AppearanceSheet(
                         }
 
                         if (viewModel.einkRefreshOnPageTurn) {
-                            // Duration
-                            Column {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Text("Duration", style = MaterialTheme.typography.bodyMedium)
-                                    Text("${viewModel.einkRefreshDurationMillis} ms", style = MaterialTheme.typography.bodyMedium)
+// Duration
+                                Column {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text("Duration", style = MaterialTheme.typography.bodyMedium)
+                                        Text("${viewModel.einkRefreshDurationMillis} ms", style = MaterialTheme.typography.bodyMedium)
+                                    }
+                                    Slider(
+                                        value = (viewModel.einkRefreshDurationMillis / 100).toFloat(),
+                                        onValueChange = { viewModel.updateEinkRefreshDurationMillis((it * 100).roundToInt()) },
+                                        valueRange = 1f..15f,
+                                        steps = 14,
+                                    )
                                 }
-                                Slider(
-                                    value = (viewModel.einkRefreshDurationMillis / 100).toFloat(),
-                                    onValueChange = { viewModel.updateEinkRefreshDurationMillis((it * 100).roundToInt()) },
-                                    valueRange = 1f..15f,
-                                    steps = 14,
-                                )
-                            }
+
+                                // Delay
+                                Column {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text("Delay", style = MaterialTheme.typography.bodyMedium)
+                                        Text("${viewModel.einkRefreshDelayMillis} ms", style = MaterialTheme.typography.bodyMedium)
+                                    }
+                                    Slider(
+                                        value = (viewModel.einkRefreshDelayMillis / 100).toFloat(),
+                                        onValueChange = { viewModel.updateEinkRefreshDelayMillis((it * 100).roundToInt()) },
+                                        valueRange = 0f..10f,
+                                        steps = 10,
+                                    )
+                                }
 
                             // Interval
                             Column {

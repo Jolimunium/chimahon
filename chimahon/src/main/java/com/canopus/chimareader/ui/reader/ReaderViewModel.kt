@@ -184,6 +184,7 @@ class ReaderViewModel(
     var einkRefreshOnPageTurn by mutableStateOf(false)
     var einkRefreshOnScroll by mutableStateOf(false)
     var einkRefreshDurationMillis by mutableIntStateOf(100)
+    var einkRefreshDelayMillis by mutableIntStateOf(0)
     var einkRefreshPageInterval by mutableIntStateOf(1)
     var einkRefreshColor by mutableStateOf("BLACK")
 
@@ -259,6 +260,7 @@ class ReaderViewModel(
             einkRefreshOnPageTurn = settings.einkRefreshOnPageTurn.first()
             einkRefreshOnScroll = settings.einkRefreshOnScroll.first()
             einkRefreshDurationMillis = settings.einkRefreshDurationMillis.first()
+            einkRefreshDelayMillis = settings.einkRefreshDelayMillis.first()
             einkRefreshPageInterval = settings.einkRefreshPageInterval.first()
             einkRefreshColor = settings.einkRefreshColor.first()
         }
@@ -431,6 +433,9 @@ class ReaderViewModel(
             settings.einkRefreshDurationMillis.collect { einkRefreshDurationMillis = it }
         }
         scope.launch {
+            settings.einkRefreshDelayMillis.collect { einkRefreshDelayMillis = it }
+        }
+        scope.launch {
             settings.einkRefreshPageInterval.collect { einkRefreshPageInterval = it }
         }
         scope.launch {
@@ -467,6 +472,7 @@ class ReaderViewModel(
 
     fun updateEinkRefreshOnScroll(value: Boolean) = scope.launch { settings.setEinkRefreshOnScroll(value) }
     fun updateEinkRefreshDurationMillis(value: Int) = scope.launch { settings.setEinkRefreshDurationMillis(value) }
+    fun updateEinkRefreshDelayMillis(value: Int) = scope.launch { settings.setEinkRefreshDelayMillis(value) }
     fun updateEinkRefreshPageInterval(value: Int) = scope.launch { settings.setEinkRefreshPageInterval(value) }
     fun updateEinkRefreshColor(value: String) = scope.launch { settings.setEinkRefreshColor(value) }
 

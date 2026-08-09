@@ -40,6 +40,9 @@ internal fun GeneralPage(screenModel: ReaderSettingsScreenModel) {
     val flashMillisPref = screenModel.preferences.flashDurationMillis()
     val flashMillis by flashMillisPref.collectAsState()
 
+    val flashDelayPref = screenModel.preferences.flashDelayMillis()
+    val flashDelayMillis by flashDelayPref.collectAsState()
+
     val flashIntervalPref = screenModel.preferences.flashPageInterval()
     val flashInterval by flashIntervalPref.collectAsState()
 
@@ -137,6 +140,14 @@ internal fun GeneralPage(screenModel: ReaderSettingsScreenModel) {
             label = stringResource(MR.strings.pref_flash_duration),
             valueString = stringResource(MR.strings.pref_flash_duration_summary, flashMillis),
             onChange = { flashMillisPref.set(it * ReaderPreferences.MILLI_CONVERSION) },
+            pillColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        )
+        SliderItem(
+            value = flashDelayMillis / ReaderPreferences.MILLI_CONVERSION,
+            valueRange = 0..10,
+            label = stringResource(MR.strings.pref_flash_delay),
+            valueString = stringResource(MR.strings.pref_flash_delay_summary, flashDelayMillis),
+            onChange = { flashDelayPref.set(it * ReaderPreferences.MILLI_CONVERSION) },
             pillColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         )
         SliderItem(

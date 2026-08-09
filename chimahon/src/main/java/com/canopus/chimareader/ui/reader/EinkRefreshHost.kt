@@ -50,6 +50,7 @@ class EinkRefreshHost {
 fun EinkRefreshOverlay(
     hostState: EinkRefreshHost,
     durationMillis: Int,
+    delayMillis: Int,
     color: EinkRefreshColor,
     interval: Int,
     modifier: Modifier = Modifier,
@@ -66,6 +67,8 @@ fun EinkRefreshOverlay(
             currentColor = null
             return@LaunchedEffect
         }
+
+        delay(delayMillis.milliseconds)
 
         val half = durationMillis.milliseconds / 2
         currentColor = when (color) {
