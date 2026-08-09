@@ -74,8 +74,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import chimahon.HoshiDicts
 import chimahon.anki.AnkiCardCreator
 import chimahon.anki.AnkiDroidBridge
@@ -611,6 +614,15 @@ object SettingsDictionaryScreen : SearchableSettings {
         val ocrBoxOpacityPref = dictionaryPreferences.ocrBoxOpacity()
         val ocrBoxOpacity by ocrBoxOpacityPref.collectAsState()
 
+        val ocrButtonSizePref = dictionaryPreferences.ocrButtonSize()
+        val ocrButtonSize by ocrButtonSizePref.collectAsState()
+
+        val ocrButtonAlphaPref = dictionaryPreferences.ocrButtonAlpha()
+        val ocrButtonAlpha by ocrButtonAlphaPref.collectAsState()
+
+        val ocrButtonColorPref = dictionaryPreferences.ocrButtonColor()
+        val ocrButtonColor by ocrButtonColorPref.collectAsState()
+
         val videoOcrAudioPaddingPref = dictionaryPreferences.videoOcrSentenceAudioPaddingSeconds()
         val videoOcrAudioPadding by videoOcrAudioPaddingPref.collectAsState()
 
@@ -1120,6 +1132,72 @@ object SettingsDictionaryScreen : SearchableSettings {
                         valueRange = 0..100 step 5,
                         steps = 19,
                         onValueChanged = { ocrBoxOpacityPref.set(it / 100f) },
+                    ),
+                    Preference.PreferenceItem.SliderPreference(
+                        value = ocrButtonSize,
+                        title = stringResource(MR.strings.pref_dict_ocr_button_size),
+                        subtitle = "${ocrButtonSize}dp",
+                        valueRange = 40..96 step 2,
+                        steps = 27,
+                        onValueChanged = { ocrButtonSizePref.set(it) },
+                    ),
+                    Preference.PreferenceItem.SliderPreference(
+                        value = (ocrButtonAlpha * 100).toInt(),
+                        title = stringResource(MR.strings.pref_dict_ocr_button_alpha),
+                        subtitle = "${(ocrButtonAlpha * 100).toInt()}%",
+                        valueRange = 10..100 step 5,
+                        steps = 17,
+                        onValueChanged = { ocrButtonAlphaPref.set(it / 100f) },
+                    ),
+                    Preference.PreferenceItem.CustomPreference(
+                        title = stringResource(MR.strings.pref_dict_ocr_button_color),
+                        content = {
+                            val btnCtx = LocalContext.current
+                            val defaultColor = ContextCompat.getColor(btnCtx, eu.kanade.tachiyomi.R.color.tachiyomi_primary)
+                            val presets = listOf(
+                                "Default" to defaultColor,
+                                "White" to Color.White.toArgb(),
+                                "Black" to Color.Black.toArgb(),
+                                "Red" to Color(0xFFD32F2F).toArgb(),
+                                "Orange" to Color(0xFFF57C00).toArgb(),
+                                "Amber" to Color(0xFFFFA000).toArgb(),
+                                "Green" to Color(0xFF388E3C).toArgb(),
+                                "Teal" to Color(0xFF00897B).toArgb(),
+                                "Blue" to Color(0xFF1976D2).toArgb(),
+                                "Indigo" to Color(0xFF3949AB).toArgb(),
+                                "Purple" to Color(0xFF7B1FA2).toArgb(),
+                                "Pink" to Color(0xFFC2185B).toArgb(),
+                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    presets.forEach { (name, argb) ->
+                                        FilterChip(
+                                            selected = (if (argb == defaultColor) 0 else argb) == ocrButtonColor,
+                                            onClick = {
+                                                ocrButtonColorPref.set(if (argb == defaultColor) 0 else argb)
+                                            },
+                                            label = { Text(name) },
+                                            leadingIcon = {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(16.dp)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(Color(argb)),
+                                                )
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        },
                     ),
                     Preference.PreferenceItem.ListPreference(
                         preference = dictionaryPreferences.ocrEngine(),

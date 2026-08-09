@@ -27,6 +27,15 @@ class DictionaryPreferences(
 
     fun ocrBoxOpacity() = preferenceStore.getFloat("pref_ocr_box_opacity", 0.0f)
 
+    /** Floating screen-lookup OCR capture button size in dp. */
+    fun ocrButtonSize() = preferenceStore.getInt("pref_ocr_button_size", 56)
+
+    /** Floating screen-lookup OCR capture button opacity (0..1). */
+    fun ocrButtonAlpha() = preferenceStore.getFloat("pref_ocr_button_alpha", 0.92f)
+
+    /** Floating screen-lookup OCR capture button background color as ARGB int; 0 = theme primary. */
+    fun ocrButtonColor() = preferenceStore.getInt("pref_ocr_button_color", 0)
+
     /** "cloud" (default) or "local" */
     fun ocrEngine() = preferenceStore.getString("pref_ocr_engine", "cloud")
 
