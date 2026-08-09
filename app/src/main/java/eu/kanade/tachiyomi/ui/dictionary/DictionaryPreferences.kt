@@ -167,6 +167,11 @@ class DictionaryPreferences(
                     chimahon.dictionary.DictionaryProfileResolver.mangaOverrideKey(mangaId), "",
                 ).get()
             },
+            readAnimeOverride = { animeId ->
+                preferenceStore.getString(
+                    chimahon.dictionary.DictionaryProfileResolver.animeOverrideKey(animeId), "",
+                ).get()
+            },
             readSourceOverride = { sourceId ->
                 preferenceStore.getString(
                     chimahon.dictionary.DictionaryProfileResolver.sourceOverrideKey(sourceId), "",
@@ -191,10 +196,14 @@ class DictionaryPreferences(
 
         // Sweep all pref keys — any override that matched the deleted ID becomes ""
         val mangaPrefix = "pref_dict_profile_manga_"
+        val animePrefix = "pref_dict_profile_anime_"
         val sourcePrefix = "pref_dict_profile_source_"
         val novelPrefix = "pref_dict_profile_novel_"
         preferenceStore.getAll().keys
-            .filter { it.startsWith(mangaPrefix) || it.startsWith(sourcePrefix) || it.startsWith(novelPrefix) }
+            .filter {
+                it.startsWith(mangaPrefix) || it.startsWith(animePrefix) ||
+                    it.startsWith(sourcePrefix) || it.startsWith(novelPrefix)
+            }
             .forEach { key ->
                 val pref = preferenceStore.getString(key, "")
                 if (pref.get() == profileId) pref.delete()

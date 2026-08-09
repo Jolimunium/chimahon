@@ -70,8 +70,9 @@ internal fun PlayerVideoOcrOverlay(
     val source by viewModel.currentSource.collectAsState()
     val anime by viewModel.currentAnime.collectAsState()
     val episode by viewModel.currentEpisode.collectAsState()
-    val activeProfile = remember(source?.id, source?.lang) {
+    val activeProfile = remember(source?.id, anime?.id, source?.lang) {
         dictionaryPreferences.profileResolver.resolve(
+            animeId = anime?.id ?: 0L,
             sourceId = source?.id ?: 0L,
             sourceLang = source?.lang.orEmpty(),
         )

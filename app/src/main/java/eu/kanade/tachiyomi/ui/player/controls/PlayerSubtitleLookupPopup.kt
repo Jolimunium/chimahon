@@ -62,6 +62,7 @@ internal fun PlayerSubtitleLookupPopup(
     val source by viewModel.currentSource.collectAsState()
     val activeProfile = remember(anime?.id, source?.id, source?.lang) {
         dictionaryPreferences.profileResolver.resolve(
+            animeId = anime?.id ?: 0L,
             sourceId = source?.id ?: 0L,
             sourceLang = source?.lang.orEmpty(),
         )

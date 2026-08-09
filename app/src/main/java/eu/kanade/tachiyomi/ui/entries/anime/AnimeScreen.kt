@@ -79,6 +79,8 @@ import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.source.local.entries.anime.isLocal
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 class AnimeScreen(
     private val animeId: Long,
@@ -208,6 +210,8 @@ class AnimeScreen(
                 }.takeIf { successState.anime.favorite },
                 changeAnimeSkipIntro = screenModel::showAnimeSkipIntroDialog
                     .takeIf { successState.anime.favorite && successState.anime.fetchType == FetchType.Episodes },
+                onClickDictionaryProfile = screenModel::showSetDictionaryProfileDialog
+                    .takeIf { successState.anime.favorite },
                 onMultiBookmarkClicked = screenModel::bookmarkEpisodes,
                 onMultiFillermarkClicked = screenModel::fillermarkEpisodes,
                 onMultiMarkAsSeenClicked = screenModel::markEpisodesSeen,
@@ -375,6 +379,22 @@ class AnimeScreen(
                     isManga = false,
                     onValueChanged = { interval: Int -> screenModel.setFetchInterval(dialog.anime, interval) }
                         .takeIf { screenModel.isUpdateIntervalEnabled },
+                )
+            }
+            is AnimeScreenModel.Dialog.SetDictionaryProfile -> {
+                val prefs = remember { Injekt.get<eu.kanade.tachiyomi.ui.dictionary.DictionaryPreferences>() }
+                val profiles = remember { prefs.profileStore.getProfiles() }
+                val overrideId = remember {
+                    prefs.rawProfileOverride(
+                        chimahon.dictionary.DictionaryProfileResolver.animeOverrideKey(dialog.anime.id),
+                    ).get()
+                }
+                eu.kanade.presentation.manga.components.DictionaryProfileDialog(
+                    profiles = profiles,
+                    currentOverrideId = overrideId,
+                    resolvedAutoProfile = screenModel.resolveAutoProfile(dialog.anime.source),
+                    onDismissRequest = onDismissRequest,
+                    onConfirm = screenModel::setAnimeDictionaryProfile,
                 )
             }
             AnimeScreenModel.Dialog.ChangeAnimeSkipIntro -> {

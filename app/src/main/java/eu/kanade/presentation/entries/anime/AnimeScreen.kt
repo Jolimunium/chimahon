@@ -169,6 +169,7 @@ fun AnimeScreen(
     onEditFetchIntervalClicked: (() -> Unit)?,
     onMigrateClicked: (() -> Unit)?,
     changeAnimeSkipIntro: (() -> Unit)?,
+    onClickDictionaryProfile: (() -> Unit)?,
 
     // For bottom action menu
     onMultiBookmarkClicked: (List<Episode>, bookmarked: Boolean) -> Unit,
@@ -240,6 +241,7 @@ fun AnimeScreen(
             onEditIntervalClicked = onEditFetchIntervalClicked,
             onMigrateClicked = onMigrateClicked,
             changeAnimeSkipIntro = changeAnimeSkipIntro,
+            onClickDictionaryProfile = onClickDictionaryProfile,
             onMultiBookmarkClicked = onMultiBookmarkClicked,
             onMultiFillermarkClicked = onMultiFillermarkClicked,
             onMultiMarkAsSeenClicked = onMultiMarkAsSeenClicked,
@@ -283,6 +285,7 @@ fun AnimeScreen(
             onEditCategoryClicked = onEditCategoryClicked,
             onEditIntervalClicked = onEditFetchIntervalClicked,
             changeAnimeSkipIntro = changeAnimeSkipIntro,
+            onClickDictionaryProfile = onClickDictionaryProfile,
             onMigrateClicked = onMigrateClicked,
             onMultiBookmarkClicked = onMultiBookmarkClicked,
             onMultiFillermarkClicked = onMultiFillermarkClicked,
@@ -339,6 +342,7 @@ private fun AnimeScreenSmallImpl(
     onEditIntervalClicked: (() -> Unit)?,
     onMigrateClicked: (() -> Unit)?,
     changeAnimeSkipIntro: (() -> Unit)?,
+    onClickDictionaryProfile: (() -> Unit)?,
     onSettingsClicked: (() -> Unit)?,
 
     // For bottom action menu
@@ -443,6 +447,7 @@ private fun AnimeScreenSmallImpl(
                     onClickMigrate = onMigrateClicked,
                     onClickSettings = onSettingsClicked,
                     changeAnimeSkipIntro = changeAnimeSkipIntro,
+                    onClickDictionaryProfile = onClickDictionaryProfile,
                     onClickRelatedAnime = onRelatedAnimeScreenClick.takeIf {
                         !expandRelatedAnime &&
                             showRelatedAnimeInOverflow &&
@@ -774,6 +779,7 @@ fun AnimeScreenLargeImpl(
     onEditIntervalClicked: (() -> Unit)?,
     onMigrateClicked: (() -> Unit)?,
     changeAnimeSkipIntro: (() -> Unit)?,
+    onClickDictionaryProfile: (() -> Unit)?,
     onSettingsClicked: (() -> Unit)?,
 
     // For bottom action menu
@@ -868,6 +874,7 @@ fun AnimeScreenLargeImpl(
                     onCancelActionMode = { onAllEpisodeSelected(false) },
                     onClickSettings = onSettingsClicked,
                     changeAnimeSkipIntro = changeAnimeSkipIntro,
+                    onClickDictionaryProfile = onClickDictionaryProfile,
                     onClickRelatedAnime = onRelatedAnimeScreenClick.takeIf {
                         !expandRelatedAnime &&
                             showRelatedAnimeInOverflow &&
