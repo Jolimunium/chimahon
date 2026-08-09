@@ -4,6 +4,41 @@ All notable changes to Chimahon are documented here.
 
 The format follows a Keep a Changelog style and uses Semantic Versioning.
 
+## [v2.3.2]
+
+### Added
+- Dictionary backup and restore via zip export/import
+- Edit mpv.conf and input.conf directly from settings
+- Size and opacity settings for the screen-lookup OCR capture button
+- Configurable delay before the e-ink flash (manga and novel readers)
+- Flash on scroll/movement for continuous readers
+- Per-anime dictionary profile override (matching manga)
+- Per-source dictionary profile override for anime extensions
+- OCR word resolution lookup mode with per-language scan/search settings
+- Clear OCR cache option on the entry three-dot menu
+- Subtitle delay remembered per episode
+- In-player Jimaku API key setup
+- Animated AVIF scene mining for player lookup
+- Strip leading French elisions in dictionary lookup variants
+- Option to disable cross-screen search history
+
+### Changed
+- Anime and manga updates consolidated into one screen
+- OCR re-runs immediately when the OCR source switches
+- Google Lens OCR results now persist
+- Milliseconds shown on controls-hide delay options
+
+### Fixed
+- Preferred audio language codes now validated like subtitles
+- "Add" button showing both '+' icon and label
+- Anime related-section divider displaying only half-width
+- Spanish deinflection
+- English reading order and text-line selection preserved in OCR
+- Stale-subtitle flash
+- Reserve space for dictionary recursive lookup tabs
+- Player lifecycle hardening
+- General YouTube and anime player fixes — sentence audio extraction, YouTube signed media URLs, NewPipe extractor update
+
 ## [v2.3.1]
 
 ### Added
