@@ -160,6 +160,11 @@ internal fun GeneralPage(screenModel: ReaderSettingsScreenModel) {
         }
     }
 
+    CheckboxItem(
+        label = stringResource(MR.strings.pref_flash_on_scroll),
+        pref = screenModel.preferences.flashOnScroll(),
+    )
+
     // SY -->
     CheckboxItem(
         label = stringResource(SYMR.strings.auto_webtoon_mode),

@@ -26,6 +26,8 @@ class ReaderPreferences(
 
     fun flashOnPageChange() = preferenceStore.getBoolean("pref_reader_flash", false)
 
+    fun flashOnScroll() = preferenceStore.getBoolean("pref_reader_flash_on_scroll", false)
+
     fun flashDurationMillis() = preferenceStore.getInt("pref_reader_flash_duration", MILLI_CONVERSION)
 
     fun flashPageInterval() = preferenceStore.getInt("pref_reader_flash_interval", 1)

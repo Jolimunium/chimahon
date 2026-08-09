@@ -32,6 +32,14 @@ class EinkRefreshHost {
         timesCalled += 1
     }
 
+    /**
+     * Triggers a refresh immediately, without the every-[interval]-call gating used by [trigger].
+     * Used for movement/scroll so each gesture repaints the display.
+     */
+    fun triggerScroll() {
+        refreshing = true
+    }
+
     fun setInterval(value: Int) {
         interval = value.coerceAtLeast(1)
         timesCalled = 0

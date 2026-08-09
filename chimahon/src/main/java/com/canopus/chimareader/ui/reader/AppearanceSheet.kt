@@ -574,6 +574,19 @@ fun AppearanceSheet(
                             )
                         }
 
+                        // Refresh on scroll/movement
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        ) {
+                            Text("Refresh on scroll", style = MaterialTheme.typography.bodyMedium)
+                            Switch(
+                                checked = viewModel.einkRefreshOnScroll,
+                                onCheckedChange = { viewModel.updateEinkRefreshOnScroll(it) },
+                            )
+                        }
+
                         if (viewModel.einkRefreshOnPageTurn) {
                             // Duration
                             Column {

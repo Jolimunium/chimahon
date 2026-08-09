@@ -54,6 +54,7 @@ fun ReaderWebView(
     onInternalLinkClicked: (url: String) -> Unit = {},
     onSelectionRectsReceived: ((String) -> Unit)? = null,
     onPageTurned: () -> Unit = {},
+    onScrollMoved: () -> Unit = {},
     onImageTapped: (imageUrl: String) -> Unit = {},
 ) {
     val pendingCommands = remember(bridge) { bridge.pendingCommands }
@@ -113,6 +114,7 @@ fun ReaderWebView(
                 onDismissPopupRequested = onDismissPopupRequested,
                 onInternalLinkClicked = onInternalLinkClicked,
                 onPageTurned = onPageTurned,
+                onScrollMoved = onScrollMoved,
                 onImageTappedCallback = onImageTapped,
             ).apply {
                 setSelectionRectsCallback(onSelectionRectsReceived)
@@ -364,6 +366,7 @@ private class ReaderAndroidWebView(
     private val onDismissPopupRequested: () -> Unit = {},
     internal val onInternalLinkClicked: (url: String) -> Unit = {},
     private val onPageTurned: () -> Unit = {},
+    private val onScrollMoved: () -> Unit = {},
     private val onImageTappedCallback: (imageUrl: String) -> Unit = {},
 ) : WebView(context) {
 
@@ -399,6 +402,10 @@ private class ReaderAndroidWebView(
 
         if (isPopupActive) {
             onDismissPopupRequested()
+        }
+
+        if (t != oldt) {
+            onScrollMoved()
         }
 
         if (continuousMode && !isImageOnly) {

@@ -40,6 +40,15 @@ class DisplayRefreshHost {
         timesCalled += 1
     }
 
+    /**
+     * Triggers a refresh immediately, without the every-[flashInterval]-call gating used by
+     * [flash]. Used for movement/scroll in continuous readers where each gesture should repaint
+     * the display rather than waiting for a page turn.
+     */
+    fun flashOnScroll() {
+        currentDisplayRefresh = true
+    }
+
     fun setInterval(interval: Int) {
         flashInterval = interval
         timesCalled = 0

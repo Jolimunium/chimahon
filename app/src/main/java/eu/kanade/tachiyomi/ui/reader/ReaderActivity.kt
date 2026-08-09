@@ -1326,6 +1326,7 @@ class ReaderActivity : BaseActivity() {
     @Composable
     private fun ContentOverlay(state: ReaderViewModel.State) {
         val flashOnPageChange by readerPreferences.flashOnPageChange().collectAsState()
+        val flashOnScroll by readerPreferences.flashOnScroll().collectAsState()
 
         val colorOverlayEnabled by readerPreferences.colorFilter().collectAsState()
         val colorOverlay by readerPreferences.colorFilterValue().collectAsState()
@@ -1360,7 +1361,7 @@ class ReaderActivity : BaseActivity() {
             colorBlendMode = colorOverlayBlendMode,
         )
 
-        if (flashOnPageChange) {
+        if (flashOnPageChange || flashOnScroll) {
             DisplayRefreshHost(hostState = displayRefreshHost)
         }
     }
@@ -1953,6 +1954,16 @@ class ReaderActivity : BaseActivity() {
         }
         // SY <--
         viewModel.onPageSelected(page, /* SY --> */ currentPageText, hasExtraPage /* SY <-- */)
+    }
+
+    /**
+     * Called from the continuous viewers (webtoon/novel) when the user scrolls or flings, so the
+     * e-ink display can refresh on movement rather than only on page change.
+     */
+    fun onReaderScroll() {
+        if (readerPreferences.flashOnScroll().get()) {
+            displayRefreshHost.flashOnScroll()
+        }
     }
 
     /**

@@ -252,10 +252,11 @@ fun ReaderScreen(
                         onInternalLinkClicked = { viewModel.jumpToUrl(it) },
                         onSelectionRectsReceived = onSelectionRectsReceived,
                         onPageTurned = { if (viewModel.einkRefreshOnPageTurn) einkRefreshHost.trigger() },
+                        onScrollMoved = { if (viewModel.einkRefreshOnScroll) einkRefreshHost.triggerScroll() },
                         onImageTapped = { uri -> tappedImageUri = uri },
                     )
 
-                    if (viewModel.einkRefreshOnPageTurn) {
+                    if (viewModel.einkRefreshOnPageTurn || viewModel.einkRefreshOnScroll) {
                         EinkRefreshOverlay(
                             hostState = einkRefreshHost,
                             durationMillis = viewModel.einkRefreshDurationMillis,

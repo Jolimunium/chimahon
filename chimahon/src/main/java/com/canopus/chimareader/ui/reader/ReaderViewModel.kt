@@ -182,6 +182,7 @@ class ReaderViewModel(
     var keepScreenOn by mutableStateOf(false)
     var systemLightSepia by mutableStateOf(false)
     var einkRefreshOnPageTurn by mutableStateOf(false)
+    var einkRefreshOnScroll by mutableStateOf(false)
     var einkRefreshDurationMillis by mutableIntStateOf(100)
     var einkRefreshPageInterval by mutableIntStateOf(1)
     var einkRefreshColor by mutableStateOf("BLACK")
@@ -256,6 +257,7 @@ class ReaderViewModel(
             keepScreenOn = settings.keepScreenOn.first()
             systemLightSepia = settings.systemLightSepia.first()
             einkRefreshOnPageTurn = settings.einkRefreshOnPageTurn.first()
+            einkRefreshOnScroll = settings.einkRefreshOnScroll.first()
             einkRefreshDurationMillis = settings.einkRefreshDurationMillis.first()
             einkRefreshPageInterval = settings.einkRefreshPageInterval.first()
             einkRefreshColor = settings.einkRefreshColor.first()
@@ -423,6 +425,9 @@ class ReaderViewModel(
             settings.einkRefreshOnPageTurn.collect { einkRefreshOnPageTurn = it }
         }
         scope.launch {
+            settings.einkRefreshOnScroll.collect { einkRefreshOnScroll = it }
+        }
+        scope.launch {
             settings.einkRefreshDurationMillis.collect { einkRefreshDurationMillis = it }
         }
         scope.launch {
@@ -459,6 +464,8 @@ class ReaderViewModel(
     fun updateKeepScreenOn(value: Boolean) = scope.launch { settings.setKeepScreenOn(value) }
     fun updateSystemLightSepia(value: Boolean) = scope.launch { settings.setSystemLightSepia(value) }
     fun updateEinkRefreshOnPageTurn(value: Boolean) = scope.launch { settings.setEinkRefreshOnPageTurn(value) }
+
+    fun updateEinkRefreshOnScroll(value: Boolean) = scope.launch { settings.setEinkRefreshOnScroll(value) }
     fun updateEinkRefreshDurationMillis(value: Int) = scope.launch { settings.setEinkRefreshDurationMillis(value) }
     fun updateEinkRefreshPageInterval(value: Int) = scope.launch { settings.setEinkRefreshPageInterval(value) }
     fun updateEinkRefreshColor(value: String) = scope.launch { settings.setEinkRefreshColor(value) }
