@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -141,6 +142,7 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsScreenModel
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import eu.kanade.tachiyomi.ui.reader.viewer.OcrLookupPopup
+import eu.kanade.tachiyomi.ui.reader.viewer.copyOcrPopupFullText
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderProgressIndicator
 import eu.kanade.tachiyomi.ui.reader.viewer.pager.PagerConfig
 import eu.kanade.tachiyomi.ui.reader.viewer.pager.PagerPageHolder
@@ -150,6 +152,7 @@ import eu.kanade.tachiyomi.ui.reader.viewer.webtoon.WebtoonViewer
 import eu.kanade.tachiyomi.ui.reader.viewer.webtoon.WebtoonPageHolder
 import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 import eu.kanade.tachiyomi.util.system.isNightMode
+import eu.kanade.tachiyomi.util.system.copyToClipboard
 import eu.kanade.tachiyomi.util.system.openInBrowser
 import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
@@ -1019,34 +1022,46 @@ class ReaderActivity : BaseActivity() {
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 shadowElevation = 8.dp,
             ) {
-                AndroidView(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = panelMaxHeight),
-                    factory = { context ->
-                        TextView(context).apply {
-                            setTextIsSelectable(true)
-                            textSize = 18f
-                            setLineSpacing(0f, 1.12f)
-                            setPadding(textPaddingPx, textPaddingPx, textPaddingPx, textPaddingPx)
-                            setBackgroundColor(Color.TRANSPARENT)
-                            isFocusable = true
-                            isFocusableInTouchMode = true
-                        }
-                    },
-                    update = { textView ->
-                        if (textView.text.toString() != state.text) {
-                            textView.text = state.text
-                        }
-                        textView.setTextColor(textColor)
-                        textView.highlightColor = highlightColor
-                        textView.post {
-                            if (!textView.hasFocus()) {
-                                textView.requestFocus()
+                Column {
+                    AndroidView(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = panelMaxHeight - 48.dp),
+                        factory = { context ->
+                            TextView(context).apply {
+                                setTextIsSelectable(true)
+                                textSize = 18f
+                                setLineSpacing(0f, 1.12f)
+                                setPadding(textPaddingPx, textPaddingPx, textPaddingPx, textPaddingPx)
+                                setBackgroundColor(Color.TRANSPARENT)
+                                isFocusable = true
+                                isFocusableInTouchMode = true
                             }
-                        }
-                    },
-                )
+                        },
+                        update = { textView ->
+                            if (textView.text.toString() != state.text) {
+                                textView.text = state.text
+                            }
+                            textView.setTextColor(textColor)
+                            textView.highlightColor = highlightColor
+                            textView.post {
+                                if (!textView.hasFocus()) {
+                                    textView.requestFocus()
+                                }
+                            }
+                        },
+                    )
+                    TextButton(
+                        modifier = Modifier.align(Alignment.End),
+                        onClick = {
+                            copyOcrPopupFullText(state.text) { label, content ->
+                                this@ReaderActivity.copyToClipboard(label, content)
+                            }
+                        },
+                    ) {
+                        Text(stringResource(MR.strings.action_copy_to_clipboard))
+                    }
+                }
             }
         }
     }
