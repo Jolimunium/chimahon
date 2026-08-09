@@ -1577,7 +1577,7 @@
     <string name="pref_player_advanced_summary">Advanced player settings</string>
     <string name="pref_player_audio_boost_cap">Volume boost cap</string>
     <string name="pref_player_audio_lang">Preferred audio language</string>
-    <string name="pref_player_audio_lang_info">Audio language info</string>
+    <string name="pref_player_audio_lang_info">Audio language(s) to be selected by default on a video with multiple audio tracks. Two- or three-letter language codes work. Multiple values can be delimited by a comma.</string>
     <string name="pref_player_audio_pitch_correction">Pitch correction</string>
     <string name="pref_player_audio_pitch_correction_summary">Correct pitch when changing speed</string>
     <string name="pref_player_audio_summary">Audio settings</string>
