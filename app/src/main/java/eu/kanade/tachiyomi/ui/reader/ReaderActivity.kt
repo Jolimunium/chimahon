@@ -31,6 +31,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -51,6 +52,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -1011,6 +1016,13 @@ class ReaderActivity : BaseActivity() {
             val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
             val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.32f).toArgb()
             val textPaddingPx = with(density) { 14.dp.toPx().toInt() }
+            var copied by remember(state.text) { mutableStateOf(false) }
+            LaunchedEffect(copied) {
+                if (copied) {
+                    delay(1_000)
+                    copied = false
+                }
+            }
 
             Surface(
                 modifier = Modifier
@@ -1057,9 +1069,24 @@ class ReaderActivity : BaseActivity() {
                             copyOcrPopupFullText(state.text) { label, content ->
                                 this@ReaderActivity.copyToClipboard(label, content)
                             }
+                            copied = true
                         },
                     ) {
-                        Text(stringResource(MR.strings.action_copy_to_clipboard))
+                        AnimatedContent(
+                            targetState = copied,
+                            label = "OCR text copy feedback",
+                        ) { wasCopied ->
+                            Icon(
+                                imageVector = if (wasCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                                contentDescription = null,
+                            )
+                        }
+                        Text(
+                            text = stringResource(
+                                if (copied) MR.strings.copied_to_clipboard_plain else MR.strings.action_copy_to_clipboard,
+                            ),
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
                     }
                 }
             }
