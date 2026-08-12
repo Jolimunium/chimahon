@@ -7,14 +7,103 @@ import chimahon.anki.AnkiMediaRequest
 import chimahon.anki.LazyAnkiSentenceAudioProvider
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class AnkiPopupMediaPreloadTest {
+
+    @Test
+    fun `hidden popup is not eligible for media preload`() {
+        assertFalse(
+            shouldPreloadPopupAnkiMedia(
+                popupVisible = false,
+                duplicateCheckCompleted = true,
+                hasNewExpression = true,
+                duplicateCheckEnabled = true,
+                duplicateAction = "prevent",
+                ankiEnabled = true,
+                hasMappedMedia = true,
+                cropMode = "full",
+            ),
+        )
+    }
+
+    @Test
+    fun `duplicate expression preloads when duplicate checking is disabled`() {
+        assertEquals(
+            true,
+            shouldPreloadPopupAnkiMedia(
+                popupVisible = true,
+                duplicateCheckCompleted = true,
+                hasNewExpression = false,
+                duplicateCheckEnabled = false,
+                duplicateAction = "prevent",
+                ankiEnabled = true,
+                hasMappedMedia = true,
+                cropMode = "full",
+            ),
+        )
+    }
+
+    @Test
+    fun `duplicate expression preloads when duplicate action overwrites`() {
+        assertEquals(
+            true,
+            shouldPreloadPopupAnkiMedia(
+                popupVisible = true,
+                duplicateCheckCompleted = true,
+                hasNewExpression = false,
+                duplicateCheckEnabled = true,
+                duplicateAction = "overwrite",
+                ankiEnabled = true,
+                hasMappedMedia = true,
+                cropMode = "full",
+            ),
+        )
+    }
+
+    @Test
+    fun `duplicate expression skips preload when duplicate action prevents add`() {
+        assertFalse(
+            shouldPreloadPopupAnkiMedia(
+                popupVisible = true,
+                duplicateCheckCompleted = true,
+                hasNewExpression = false,
+                duplicateCheckEnabled = true,
+                duplicateAction = "prevent",
+                ankiEnabled = true,
+                hasMappedMedia = true,
+                cropMode = "full",
+            ),
+        )
+    }
+
+    @Test
+    fun `cancelling a pending preload before its delay prevents native capture`() = runTest {
+        val nativeCaptureStarted = CompletableDeferred<Unit>()
+        val result = async {
+            delay(POPUP_ANKI_MEDIA_PRELOAD_DELAY_MS)
+            nativeCaptureStarted.complete(Unit)
+            null
+        }
+        val pending = PendingPopupAnkiMediaPreload(
+            frameId = "frame",
+            nativeCaptureStarted = nativeCaptureStarted,
+            result = result,
+        )
+        runCurrent()
+
+        cancelPopupAnkiMediaPreload(pending)
+
+        assertTrue(result.isCancelled)
+        assertFalse(nativeCaptureStarted.isCompleted)
+    }
 
     @Test
     fun `popup media retains an unavailable sentence-audio preparation`() {
