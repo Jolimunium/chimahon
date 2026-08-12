@@ -21,16 +21,17 @@ class AnkiPopupMediaPreloadTest {
     @Test
     fun `hidden popup is not eligible for media preload`() {
         assertFalse(
-            shouldPreloadPopupAnkiMedia(
+            planPopupAnkiMediaPreload(
                 popupVisible = false,
                 duplicateCheckCompleted = true,
                 hasNewExpression = true,
                 duplicateCheckEnabled = true,
                 duplicateAction = "prevent",
                 ankiEnabled = true,
-                hasMappedMedia = true,
+                screenshotFieldMapped = true,
+                sentenceAudioFieldMapped = true,
                 cropMode = "full",
-            ),
+            ).shouldStart,
         )
     }
 
@@ -38,16 +39,17 @@ class AnkiPopupMediaPreloadTest {
     fun `duplicate expression preloads when duplicate checking is disabled`() {
         assertEquals(
             true,
-            shouldPreloadPopupAnkiMedia(
+            planPopupAnkiMediaPreload(
                 popupVisible = true,
                 duplicateCheckCompleted = true,
                 hasNewExpression = false,
                 duplicateCheckEnabled = false,
                 duplicateAction = "prevent",
                 ankiEnabled = true,
-                hasMappedMedia = true,
+                screenshotFieldMapped = true,
+                sentenceAudioFieldMapped = true,
                 cropMode = "full",
-            ),
+            ).shouldStart,
         )
     }
 
@@ -55,33 +57,71 @@ class AnkiPopupMediaPreloadTest {
     fun `duplicate expression preloads when duplicate action overwrites`() {
         assertEquals(
             true,
-            shouldPreloadPopupAnkiMedia(
+            planPopupAnkiMediaPreload(
                 popupVisible = true,
                 duplicateCheckCompleted = true,
                 hasNewExpression = false,
                 duplicateCheckEnabled = true,
                 duplicateAction = "overwrite",
                 ankiEnabled = true,
-                hasMappedMedia = true,
+                screenshotFieldMapped = true,
+                sentenceAudioFieldMapped = true,
                 cropMode = "full",
-            ),
+            ).shouldStart,
         )
     }
 
     @Test
     fun `duplicate expression skips preload when duplicate action prevents add`() {
         assertFalse(
-            shouldPreloadPopupAnkiMedia(
+            planPopupAnkiMediaPreload(
                 popupVisible = true,
                 duplicateCheckCompleted = true,
                 hasNewExpression = false,
                 duplicateCheckEnabled = true,
                 duplicateAction = "prevent",
                 ankiEnabled = true,
-                hasMappedMedia = true,
+                screenshotFieldMapped = true,
+                sentenceAudioFieldMapped = true,
                 cropMode = "full",
-            ),
+            ).shouldStart,
         )
+    }
+
+    @Test
+    fun `crop mode preloads sentence audio without preloading a screenshot`() {
+        val plan = planPopupAnkiMediaPreload(
+            popupVisible = true,
+            duplicateCheckCompleted = true,
+            hasNewExpression = true,
+            duplicateCheckEnabled = true,
+            duplicateAction = "prevent",
+            ankiEnabled = true,
+            screenshotFieldMapped = true,
+            sentenceAudioFieldMapped = true,
+            cropMode = "crop",
+        )
+
+        assertTrue(plan.shouldStart)
+        assertFalse(plan.prepareScreenshot)
+        assertTrue(plan.prepareSentenceAudio)
+    }
+
+    @Test
+    fun `no screenshot mode skips a screenshot-only preload`() {
+        val plan = planPopupAnkiMediaPreload(
+            popupVisible = true,
+            duplicateCheckCompleted = true,
+            hasNewExpression = true,
+            duplicateCheckEnabled = true,
+            duplicateAction = "prevent",
+            ankiEnabled = true,
+            screenshotFieldMapped = true,
+            sentenceAudioFieldMapped = false,
+            cropMode = "no_screenshot",
+        )
+
+        assertFalse(plan.shouldStart)
     }
 
     @Test
@@ -99,10 +139,36 @@ class AnkiPopupMediaPreloadTest {
         )
         runCurrent()
 
-        cancelPopupAnkiMediaPreload(pending)
+        val prepared = takePopupAnkiMediaForAdd(
+            cachedMedia = null,
+            pendingPreload = pending,
+        )
 
+        assertEquals(null, prepared)
         assertTrue(result.isCancelled)
         assertFalse(nativeCaptureStarted.isCompleted)
+    }
+
+    @Test
+    fun `add reuses a pending preload after native capture starts`() = runTest {
+        val expected = PopupPreparedAnkiMedia(
+            frameId = "frame",
+            screenshotBytes = byteArrayOf(1),
+            sentenceAudio = null,
+        )
+        val nativeCaptureStarted = CompletableDeferred<Unit>().apply { complete(Unit) }
+        val pending = PendingPopupAnkiMediaPreload(
+            frameId = "frame",
+            nativeCaptureStarted = nativeCaptureStarted,
+            result = async { expected },
+        )
+
+        val prepared = takePopupAnkiMediaForAdd(
+            cachedMedia = null,
+            pendingPreload = pending,
+        )
+
+        assertEquals(expected, prepared)
     }
 
     @Test

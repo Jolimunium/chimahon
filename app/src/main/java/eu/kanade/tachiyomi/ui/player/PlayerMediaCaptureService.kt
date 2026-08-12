@@ -40,6 +40,14 @@ import kotlin.math.min
 internal data class VideoOcrAnimatedSceneRequest(
     val startSeconds: Double,
     val endSeconds: Double,
+    val input: AnimatedSceneInputSnapshot?,
+)
+
+/** Input needed to recreate an animated scene after the dictionary popup has opened. */
+internal data class AnimatedSceneInputSnapshot(
+    val source: String,
+    val videoUrl: String,
+    val headers: List<Pair<String, String>>,
 )
 
 /**
@@ -54,6 +62,7 @@ internal class PlayerMediaCaptureService(
     private val getTimeSeconds: () -> Double,
     private val getOcrPaddingSeconds: () -> Double,
     private val readMpvSnapshot: () -> SentenceAudioMpvSnapshot,
+    private val readMpvVideoPath: () -> String? = { MPVLib.getPropertyString("path") },
     private val prepareSentenceAudioOverride: (suspend (SentenceAudioCaptureRequest) -> AnkiSentenceAudioPreparation)? = null,
 ) {
 
@@ -105,6 +114,20 @@ internal class PlayerMediaCaptureService(
         return VideoOcrAnimatedSceneRequest(
             startSeconds = center - padding,
             endSeconds = center + padding,
+            input = snapshotAnimatedSceneInput(),
+        )
+    }
+
+    private fun snapshotAnimatedSceneInput(): AnimatedSceneInputSnapshot? {
+        val video = getVideo() ?: return null
+        val source = readMpvVideoPath()
+            ?.takeIf { it.isNotBlank() }
+            ?: video.videoUrl
+        val animeSource = getSource() as? AnimeHttpSource
+        return AnimatedSceneInputSnapshot(
+            source = source,
+            videoUrl = video.videoUrl,
+            headers = (video.headers ?: animeSource?.headers)?.toList().orEmpty(),
         )
     }
 
@@ -140,42 +163,50 @@ internal class PlayerMediaCaptureService(
      * using the bundled libavif encoder. Returns null on failure so callers can fall back to a still.
      */
     suspend fun captureAnimatedVideoForAnki(startSeconds: Double?, endSeconds: Double?): ByteArray? {
+        return captureAnimatedVideoForAnki(
+            input = snapshotAnimatedSceneInput(),
+            startSeconds = startSeconds,
+            endSeconds = endSeconds,
+        )
+    }
+
+    private suspend fun captureAnimatedVideoForAnki(
+        input: AnimatedSceneInputSnapshot?,
+        startSeconds: Double?,
+        endSeconds: Double?,
+    ): ByteArray? {
         val start = startSeconds ?: return null
         val end = endSeconds ?: return null
         if (end <= start) return null
 
-        val video = getVideo() ?: return null
+        val inputSnapshot = input ?: return null
         val yuvFile = File(context.cacheDir, "chimahon_scene_${System.currentTimeMillis()}.yuv")
         return try {
             withIOContext {
                 yuvFile.delete()
-                val rawInput = MPVLib.getPropertyString("path")
-                    ?.takeIf { it.isNotBlank() }
-                    ?: video.videoUrl
-                val input = when {
-                    video.videoUrl.startsWith("content://") -> Uri.parse(video.videoUrl).toFFmpegReadString(context)
+                val rawInput = inputSnapshot.source
+                val ffmpegInput = when {
+                    inputSnapshot.videoUrl.startsWith("content://") -> Uri.parse(inputSnapshot.videoUrl).toFFmpegReadString(context)
                     rawInput.startsWith("file://") -> Uri.parse(rawInput).path ?: rawInput
                     else -> rawInput
                 }.replace("\"", "\\\"")
 
-                val source = getSource() as? AnimeHttpSource
-                val headers = video.headers ?: source?.headers
-                val headerOptions = if (rawInput.startsWith("http") && headers != null) {
-                    headers.joinToString("", "-headers '", "'") {
+                val headerOptions = if (rawInput.startsWith("http") && inputSnapshot.headers.isNotEmpty()) {
+                    inputSnapshot.headers.joinToString("", "-headers '", "'") {
                         "${it.first}: ${it.second.replace("'", "'\\''")}\r\n"
                     }
                 } else {
                     ""
                 }
                 val duration = (end - start).coerceIn(0.25, 10.0)
-                val probe = probeVideoDimensions(input, headerOptions)
+                val probe = probeVideoDimensions(ffmpegInput, headerOptions)
                 val (outWidth, outHeight) = probe ?: return@withIOContext null
                 val frameSize = outWidth * outHeight * 3 / 2
                 val command = listOf(
                     headerOptions,
                     "-ss ${start.coerceAtLeast(0.0).formatSeconds()}",
                     "-t ${duration.formatSeconds()}",
-                    "-i \"$input\"",
+                    "-i \"$ffmpegInput\"",
                     "-an",
                     "-sn",
                     "-dn",
@@ -228,6 +259,7 @@ internal class PlayerMediaCaptureService(
 
     suspend fun captureVideoOcrAnimatedForAnki(request: VideoOcrAnimatedSceneRequest): ByteArray? {
         return captureAnimatedVideoForAnki(
+            input = request.input,
             startSeconds = request.startSeconds,
             endSeconds = request.endSeconds,
         )
