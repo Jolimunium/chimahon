@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.ui.reader.viewer
 
 import android.graphics.Bitmap
 import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import android.webkit.WebView
 import androidx.compose.foundation.BorderStroke
@@ -33,6 +34,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +63,9 @@ import chimahon.anki.AnkiMediaRequest
 import chimahon.anki.AnkiMediaWarning
 import chimahon.anki.AnkiProfile
 import chimahon.anki.AnkiResult
+import chimahon.anki.AnkiSentenceAudioPreparation
+import chimahon.anki.AnkiSentenceAudioSource
+import chimahon.anki.prepareSentenceAudioForMarker
 import chimahon.ocr.effectiveSearchResolution
 import chimahon.ocr.nextWordBoundarySubstring
 import chimahon.util.ImageEncoder
@@ -85,6 +90,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tachiyomi.core.common.i18n.stringResource
@@ -109,6 +116,7 @@ private data class LookupFrame(
     val mediaDataUris: Map<String, String>,
     val existingExpressions: Set<String>,
     val existingCardIds: Map<String, Long> = emptyMap(),
+    val duplicateCheckCompleted: Boolean = false,
     val entryJsons: List<String>? = null,
 )
 
@@ -396,6 +404,7 @@ fun OcrLookupPopup(
                             stack[frameIndex] = stack[frameIndex].copy(
                                 existingExpressions = existingCardIds.keys,
                                 existingCardIds = existingCardIds,
+                                duplicateCheckCompleted = true,
                             )
                             lookupStackState = lookupStackState.copy(stack = stack)
                         }
@@ -546,6 +555,131 @@ fun OcrLookupPopup(
         }
     }
 
+    val latestScreenshotRequest by rememberUpdatedState(onRequestScreenshot)
+    val latestAnimatedSceneRequest by rememberUpdatedState(onRequestAnimatedScene)
+    val latestSentenceAudioRequest by rememberUpdatedState(onRequestSentenceAudio)
+    val latestMediaRequest by rememberUpdatedState(mediaRequest)
+    var preloadedAnkiMedia by remember { mutableStateOf<PopupPreparedAnkiMedia?>(null) }
+    var pendingAnkiMediaPreload by remember { mutableStateOf<PendingPopupAnkiMediaPreload?>(null) }
+    val preloadFrameId = currentFrame?.id
+    val duplicateCheckCompleted = currentFrame?.duplicateCheckCompleted == true
+    val hasNewExpression = currentFrame?.results?.any {
+        it.term.expression !in currentFrame.existingExpressions
+    } == true
+    val shouldPreloadAnkiMedia = ankiEnabled &&
+        (screenshotFieldMapped || sentenceAudioFieldMapped) &&
+        cropMode != "crop"
+
+    LaunchedEffect(
+        preloadFrameId,
+        duplicateCheckCompleted,
+        hasNewExpression,
+        shouldPreloadAnkiMedia,
+        cropMode,
+    ) {
+        val previousPreload = pendingAnkiMediaPreload
+        if (previousPreload != null) {
+            previousPreload.result.cancelAndJoin()
+            if (pendingAnkiMediaPreload === previousPreload) {
+                pendingAnkiMediaPreload = null
+            }
+        }
+        preloadedAnkiMedia = null
+        val frameId = preloadFrameId ?: return@LaunchedEffect
+        if (!duplicateCheckCompleted || !hasNewExpression || !shouldPreloadAnkiMedia) {
+            return@LaunchedEffect
+        }
+
+        val operationId = "preload-$frameId"
+        val startedAtMillis = SystemClock.elapsedRealtime()
+        Log.i("AnkiCardCreator", "anki_media_preload operation=$operationId stage=scheduled elapsed_ms=0")
+        val nativeCaptureStarted = CompletableDeferred<Unit>()
+        val preloadResult = scope.async {
+            try {
+                delay(POPUP_ANKI_MEDIA_PRELOAD_DELAY_MS)
+                ankiMediaPreloadGate.run {
+                    nativeCaptureStarted.complete(Unit)
+                    Log.i(
+                        "AnkiCardCreator",
+                        "anki_media_preload operation=$operationId stage=started " +
+                            "elapsed_ms=${SystemClock.elapsedRealtime() - startedAtMillis}",
+                    )
+                    val screenshotBytes = if (screenshotFieldMapped && cropMode != "no_screenshot") {
+                        if (
+                            cropMode == chimahon.anki.AnkiScreenshotMode.ANIMATED_SCENE.storageValue &&
+                            latestAnimatedSceneRequest != null
+                        ) {
+                            latestAnimatedSceneRequest?.invoke()
+                        } else {
+                            latestScreenshotRequest?.invoke()?.let { bitmap ->
+                                withContext(Dispatchers.Default) { ImageEncoder.encode(bitmap).bytes }
+                            }
+                        }
+                    } else {
+                        null
+                    }
+                    Log.i(
+                        "AnkiCardCreator",
+                        "anki_media_preload operation=$operationId stage=screenshot_prepared " +
+                            "elapsed_ms=${SystemClock.elapsedRealtime() - startedAtMillis} " +
+                            "media_bytes=${screenshotBytes?.size ?: 0}",
+                    )
+                    val sentenceAudio = if (sentenceAudioFieldMapped) {
+                        val preparation = if (latestMediaRequest != null) {
+                            prepareSentenceAudioForMarker(
+                                hasSentenceAudioMarker = true,
+                                provider = latestMediaRequest?.sentenceAudioProvider,
+                                prepared = latestMediaRequest?.preparedSentenceAudio,
+                            )
+                        } else {
+                            latestSentenceAudioRequest?.invoke()?.let { bytes ->
+                                AnkiSentenceAudioPreparation.Ready(
+                                    AnkiSentenceAudioSource.fromBytes(bytes, "m4a"),
+                                )
+                            }
+                        }
+                        preparation
+                    } else {
+                        null
+                    }
+                    Log.i(
+                        "AnkiCardCreator",
+                        "anki_media_preload operation=$operationId stage=completed " +
+                            "elapsed_ms=${SystemClock.elapsedRealtime() - startedAtMillis} " +
+                            "screenshot_bytes=${screenshotBytes?.size ?: 0} " +
+                            "sentence_audio_bytes=${(sentenceAudio as? AnkiSentenceAudioPreparation.Ready)?.source?.data?.size ?: 0}",
+                    )
+                    PopupPreparedAnkiMedia(
+                        frameId = frameId,
+                        screenshotBytes = screenshotBytes,
+                        sentenceAudio = sentenceAudio,
+                    )
+                }
+            } catch (e: CancellationException) {
+                Log.i(
+                    "AnkiCardCreator",
+                    "anki_media_preload operation=$operationId stage=cancelled " +
+                        "elapsed_ms=${SystemClock.elapsedRealtime() - startedAtMillis}",
+                )
+                throw e
+            } catch (e: Exception) {
+                Log.w("AnkiCardCreator", "anki_media_preload operation=$operationId stage=failed", e)
+                null
+            }
+        }
+        val pendingPreload = PendingPopupAnkiMediaPreload(
+            frameId = frameId,
+            nativeCaptureStarted = nativeCaptureStarted,
+            result = preloadResult,
+        )
+        pendingAnkiMediaPreload = pendingPreload
+        val prepared = preloadResult.await()
+        if (pendingAnkiMediaPreload === pendingPreload) {
+            preloadedAnkiMedia = prepared
+            pendingAnkiMediaPreload = null
+        }
+    }
+
     fun performAnkiLookup(
         index: Int,
         glossaryIndex: Int?,
@@ -670,23 +804,70 @@ fun OcrLookupPopup(
             }
         } else {
             miningScope.launch {
-                val encoding = if (screenshotFieldMapped && cropMode != "no_screenshot") {
-                    onRequestScreenshot?.invoke()?.let { ImageEncoder.encode(it) }
-                } else {
-                    null
+                val timingOperationId = "add-${UUID.randomUUID()}"
+                val timingStartedAtMillis = SystemClock.elapsedRealtime()
+                Log.i("AnkiCardCreator", "anki_add operation=$timingOperationId stage=started elapsed_ms=0")
+                var cachedMedia = preloadedAnkiMedia?.takeIf { it.frameId == miningFrame?.id }
+                val pendingPreload = pendingAnkiMediaPreload?.takeIf { it.frameId == miningFrame?.id }
+                if (cachedMedia == null && pendingPreload != null) {
+                    if (pendingPreload.nativeCaptureStarted.isCompleted) {
+                        cachedMedia = try {
+                            pendingPreload.result.await()
+                        } catch (_: CancellationException) {
+                            null
+                        }
+                    } else {
+                        pendingPreload.result.cancelAndJoin()
+                    }
+                    if (pendingAnkiMediaPreload === pendingPreload) {
+                        pendingAnkiMediaPreload = null
+                    }
                 }
-                val screenshotBytes = if (
-                    cropMode == chimahon.anki.AnkiScreenshotMode.ANIMATED_SCENE.storageValue &&
-                    onRequestAnimatedScene != null
-                ) {
-                    onRequestAnimatedScene.invoke()
-                } else {
-                    encoding?.bytes
+                val preparedAddMedia = ankiMediaPreloadGate.run {
+                    Log.i(
+                        "AnkiCardCreator",
+                        "anki_add operation=$timingOperationId stage=popup_media_cache " +
+                            "elapsed_ms=${SystemClock.elapsedRealtime() - timingStartedAtMillis} " +
+                            "cache_hit=${cachedMedia != null} " +
+                            "screenshot_ready=${cachedMedia?.screenshotBytes != null} " +
+                            "sentence_audio_ready=${cachedMedia?.sentenceAudio != null}",
+                    )
+                    val encoding = if (
+                        cachedMedia?.screenshotBytes == null &&
+                        screenshotFieldMapped &&
+                        cropMode != "no_screenshot"
+                    ) {
+                        onRequestScreenshot?.invoke()?.let { ImageEncoder.encode(it) }
+                    } else {
+                        null
+                    }
+                    val screenshotBytes = cachedMedia?.screenshotBytes ?: if (
+                        cropMode == chimahon.anki.AnkiScreenshotMode.ANIMATED_SCENE.storageValue &&
+                        onRequestAnimatedScene != null
+                    ) {
+                        onRequestAnimatedScene.invoke()
+                    } else {
+                        encoding?.bytes
+                    }
+                    Log.i(
+                        "AnkiCardCreator",
+                        "anki_add operation=$timingOperationId stage=screenshot_prepared " +
+                            "elapsed_ms=${SystemClock.elapsedRealtime() - timingStartedAtMillis} " +
+                            "media_bytes=${screenshotBytes?.size ?: 0}",
+                    )
+                    val sentenceAudioBytes = if (sentenceAudioFieldMapped && mediaRequest == null) {
+                        onRequestSentenceAudio?.invoke()
+                    } else {
+                        null
+                    }
+                    screenshotBytes to sentenceAudioBytes
                 }
-                val sentenceAudioBytes = if (sentenceAudioFieldMapped && mediaRequest == null) {
-                    onRequestSentenceAudio?.invoke()
-                } else {
-                    null
+                val mediaRequestForAdd = mediaRequest
+                    ?.withSerializedSentenceAudioPreparation(ankiMediaPreloadGate)
+                    ?.copy(
+                        preparedSentenceAudio = cachedMedia?.sentenceAudio ?: mediaRequest.preparedSentenceAudio,
+                    ) ?: cachedMedia?.sentenceAudio?.let { preparedSentenceAudio ->
+                    AnkiMediaRequest(preparedSentenceAudio = preparedSentenceAudio)
                 }
                 val ankiResult = AnkiCardCreator.addToAnki(
                     context = context,
@@ -702,8 +883,8 @@ fun OcrLookupPopup(
                     offset = miningOffset,
                     media = mediaInfo,
                     glossaryIndex = glossaryIndex,
-                    screenshotBytes = screenshotBytes,
-                    sentenceAudioBytes = sentenceAudioBytes,
+                    screenshotBytes = preparedAddMedia.first,
+                    sentenceAudioBytes = preparedAddMedia.second,
                     selection = result.matched,
                     selectedDict = selectedDict,
                     popupSelection = popupSelection,
@@ -713,7 +894,9 @@ fun OcrLookupPopup(
                     syncOnCreate = ankiSyncOnCreate,
                     profileId = activeProfile.id,
                     titleId = titleId,
-                    mediaRequest = mediaRequest,
+                    mediaRequest = mediaRequestForAdd,
+                    timingOperationId = timingOperationId,
+                    timingStartedAtMillis = timingStartedAtMillis,
                 )
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
                     when (ankiResult) {

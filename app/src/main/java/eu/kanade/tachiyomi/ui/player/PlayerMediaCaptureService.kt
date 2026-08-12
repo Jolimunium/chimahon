@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.FFmpegKitConfig
 import com.arthenica.ffmpegkit.FFmpegSession
 import com.arthenica.ffmpegkit.FFprobeKit
@@ -35,6 +36,11 @@ import java.io.File
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
+
+internal data class VideoOcrAnimatedSceneRequest(
+    val startSeconds: Double,
+    val endSeconds: Double,
+)
 
 /**
  * Captures media from the player for Anki mining: still OCR frames, sentence audio slices,
@@ -93,6 +99,15 @@ internal class PlayerMediaCaptureService(
         return createSentenceAudioMediaRequest(center - padding, center + padding)
     }
 
+    fun createVideoOcrAnimatedSceneRequest(): VideoOcrAnimatedSceneRequest {
+        val center = getTimeSeconds()
+        val padding = getOcrPaddingSeconds()
+        return VideoOcrAnimatedSceneRequest(
+            startSeconds = center - padding,
+            endSeconds = center + padding,
+        )
+    }
+
     private fun createSentenceAudioMediaRequest(startSeconds: Double?, endSeconds: Double?): AnkiMediaRequest {
         val video = getVideo()
         val mpv = readMpvSnapshot()
@@ -131,7 +146,7 @@ internal class PlayerMediaCaptureService(
 
         val video = getVideo() ?: return null
         val yuvFile = File(context.cacheDir, "chimahon_scene_${System.currentTimeMillis()}.yuv")
-        return runCatching {
+        return try {
             withIOContext {
                 yuvFile.delete()
                 val rawInput = MPVLib.getPropertyString("path")
@@ -180,8 +195,7 @@ internal class PlayerMediaCaptureService(
                 )
                     .filter { it.isNotBlank() }
                     .joinToString(" ")
-                val session = FFmpegSession.create(FFmpegKitConfig.parseArguments(command))
-                FFmpegKitConfig.ffmpegExecute(session)
+                val session = executeFfmpegCancellable(FFmpegKitConfig.parseArguments(command))
                 if (!ReturnCode.isSuccess(session.returnCode) || !yuvFile.exists() || yuvFile.length() < frameSize) {
                     session.failStackTrace?.let { logcat(LogPriority.WARN) { it } }
                     return@withIOContext null
@@ -202,21 +216,32 @@ internal class PlayerMediaCaptureService(
                     AvifEncoder.SPEED_FASTEST,
                 )
             }
-        }.onFailure {
-            logcat(LogPriority.WARN, it) { "Failed to capture animated scene" }
-        }.getOrNull().also {
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Failed to capture animated scene" }
+            null
+        } finally {
             yuvFile.delete()
         }
     }
 
-    suspend fun captureVideoOcrAnimatedForAnki(): ByteArray? {
-        val centerSeconds = getTimeSeconds()
-        val paddingSeconds = getOcrPaddingSeconds()
+    suspend fun captureVideoOcrAnimatedForAnki(request: VideoOcrAnimatedSceneRequest): ByteArray? {
         return captureAnimatedVideoForAnki(
-            startSeconds = centerSeconds - paddingSeconds,
-            endSeconds = centerSeconds + paddingSeconds,
+            startSeconds = request.startSeconds,
+            endSeconds = request.endSeconds,
         )
     }
+
+    private suspend fun executeFfmpegCancellable(arguments: Array<String>): FFmpegSession =
+        suspendCancellableCoroutine { continuation ->
+            val session = FFmpegKit.executeWithArgumentsAsync(arguments) { completedSession ->
+                if (continuation.isActive) {
+                    continuation.resumeWith(Result.success(completedSession))
+                }
+            }
+            continuation.invokeOnCancellation { session.cancel() }
+        }
 
     private suspend fun probeVideoDimensions(input: String, headerOptions: String): Pair<Int, Int>? =
         suspendCancellableCoroutine<FFprobeSession?> { continuation ->
