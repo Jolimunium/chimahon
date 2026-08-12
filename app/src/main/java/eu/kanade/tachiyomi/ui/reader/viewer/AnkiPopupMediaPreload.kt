@@ -5,6 +5,7 @@ import chimahon.anki.AnkiSentenceAudioPreparation
 import chimahon.anki.LazyAnkiSentenceAudioProvider
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -33,6 +34,27 @@ internal data class PendingPopupAnkiMediaPreload(
     val nativeCaptureStarted: CompletableDeferred<Unit>,
     val result: Deferred<PopupPreparedAnkiMedia?>,
 )
+
+internal fun shouldPreloadPopupAnkiMedia(
+    popupVisible: Boolean,
+    duplicateCheckCompleted: Boolean,
+    hasNewExpression: Boolean,
+    duplicateCheckEnabled: Boolean,
+    duplicateAction: String,
+    ankiEnabled: Boolean,
+    hasMappedMedia: Boolean,
+    cropMode: String,
+): Boolean =
+    popupVisible &&
+        duplicateCheckCompleted &&
+        ankiEnabled &&
+        hasMappedMedia &&
+        cropMode != "crop" &&
+        (hasNewExpression || !duplicateCheckEnabled || duplicateAction == "overwrite")
+
+internal suspend fun cancelPopupAnkiMediaPreload(preload: PendingPopupAnkiMediaPreload?) {
+    preload?.result?.cancelAndJoin()
+}
 
 internal fun AnkiMediaRequest.withSerializedSentenceAudioPreparation(
     gate: SerializedAnkiMediaPreloadGate,

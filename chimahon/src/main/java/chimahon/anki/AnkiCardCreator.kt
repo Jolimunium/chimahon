@@ -1,6 +1,7 @@
 package chimahon.anki
 
 import android.content.Context
+import android.util.Log
 import chimahon.Cloze
 import chimahon.DictionaryRepository
 import chimahon.HoshiDicts
@@ -230,7 +231,7 @@ object AnkiCardCreator {
     internal var timingClock: () -> Long = android.os.SystemClock::elapsedRealtime
     @Volatile
     internal var timingEventSink: (AnkiAddTimingEvent) -> Unit = { event ->
-        android.util.Log.i(TAG, formatAnkiAddTimingEvent(event))
+        Log.d(TAG, formatAnkiAddTimingEvent(event))
     }
 
     internal fun resetBridgeFactoryForTests() {
@@ -243,7 +244,7 @@ object AnkiCardCreator {
 
     internal fun resetTimingDiagnosticsForTests() {
         timingClock = android.os.SystemClock::elapsedRealtime
-        timingEventSink = { event -> android.util.Log.i(TAG, formatAnkiAddTimingEvent(event)) }
+        timingEventSink = { event -> Log.d(TAG, formatAnkiAddTimingEvent(event)) }
     }
 
     private data class DictionaryMediaReference(
