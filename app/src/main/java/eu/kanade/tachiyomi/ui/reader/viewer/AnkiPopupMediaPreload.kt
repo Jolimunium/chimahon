@@ -35,25 +35,57 @@ internal data class PendingPopupAnkiMediaPreload(
     val result: Deferred<PopupPreparedAnkiMedia?>,
 )
 
-internal fun shouldPreloadPopupAnkiMedia(
+internal data class PopupAnkiMediaPreloadPlan(
+    val prepareScreenshot: Boolean,
+    val prepareSentenceAudio: Boolean,
+) {
+    val shouldStart: Boolean
+        get() = prepareScreenshot || prepareSentenceAudio
+}
+
+internal fun planPopupAnkiMediaPreload(
     popupVisible: Boolean,
     duplicateCheckCompleted: Boolean,
     hasNewExpression: Boolean,
     duplicateCheckEnabled: Boolean,
     duplicateAction: String,
     ankiEnabled: Boolean,
-    hasMappedMedia: Boolean,
+    screenshotFieldMapped: Boolean,
+    sentenceAudioFieldMapped: Boolean,
     cropMode: String,
-): Boolean =
-    popupVisible &&
-        duplicateCheckCompleted &&
-        ankiEnabled &&
-        hasMappedMedia &&
-        cropMode != "crop" &&
-        (hasNewExpression || !duplicateCheckEnabled || duplicateAction == "overwrite")
+): PopupAnkiMediaPreloadPlan {
+    val mayAddCard =
+        popupVisible &&
+            duplicateCheckCompleted &&
+            ankiEnabled &&
+            (hasNewExpression || !duplicateCheckEnabled || duplicateAction == "overwrite")
+    if (!mayAddCard) return PopupAnkiMediaPreloadPlan(false, false)
+
+    return PopupAnkiMediaPreloadPlan(
+        prepareScreenshot = screenshotFieldMapped && cropMode != "crop" && cropMode != "no_screenshot",
+        prepareSentenceAudio = sentenceAudioFieldMapped,
+    )
+}
 
 internal suspend fun cancelPopupAnkiMediaPreload(preload: PendingPopupAnkiMediaPreload?) {
     preload?.result?.cancelAndJoin()
+}
+
+internal suspend fun takePopupAnkiMediaForAdd(
+    cachedMedia: PopupPreparedAnkiMedia?,
+    pendingPreload: PendingPopupAnkiMediaPreload?,
+): PopupPreparedAnkiMedia? {
+    if (cachedMedia != null) return cachedMedia
+    val pending = pendingPreload ?: return null
+    if (!pending.nativeCaptureStarted.isCompleted) {
+        pending.result.cancelAndJoin()
+        return null
+    }
+    return try {
+        pending.result.await()
+    } catch (_: kotlinx.coroutines.CancellationException) {
+        null
+    }
 }
 
 internal fun AnkiMediaRequest.withSerializedSentenceAudioPreparation(
