@@ -136,6 +136,7 @@ import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.source.service.SourceManager
 import tachiyomi.source.local.isLocal
 import tachiyomi.source.local.io.Archive
+import mihon.domain.panel.repository.PanelDetectionRepository
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
@@ -493,6 +494,7 @@ class ReaderViewModel @JvmOverloads constructor(
         }
         mokuroChapterCache.clear()
         mokuroLoadMutex.clear()
+        Injekt.get<PanelDetectionRepository>().cleanup()
     }
 
     /**

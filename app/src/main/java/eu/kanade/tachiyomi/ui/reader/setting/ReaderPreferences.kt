@@ -85,6 +85,8 @@ class ReaderPreferences(
 
     fun navigateToPan() = preferenceStore.getBoolean("navigate_pan", true)
 
+    fun panelNavigation() = preferenceStore.getBoolean("panel_navigation", false)
+
     fun landscapeZoom() = preferenceStore.getBoolean("landscape_zoom", true)
 
     // KMK -->
