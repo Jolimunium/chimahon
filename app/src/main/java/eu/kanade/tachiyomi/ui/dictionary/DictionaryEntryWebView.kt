@@ -68,6 +68,7 @@ fun DictionaryEntryWebView(
     val context = LocalContext.current
     val dictionaryPreferences = remember { Injekt.get<DictionaryPreferences>() }
     val themeMode by dictionaryPreferences.themeMode().collectAsState()
+    val compactGlossary by dictionaryPreferences.compactGlossary().collectAsState()
     val customColor by dictionaryPreferences.customColor().collectAsState()
 
     val prefs = remember { Injekt.get<DictionaryPreferences>() }
@@ -126,7 +127,7 @@ fun DictionaryEntryWebView(
         showPitchDiagram, showPitchNumber, showPitchText,
         activeProfile, tabs, recursiveNavMode, wordAudioEnabled,
         effectiveWordAudioAutoplay, showNavigationButtons, groupPitches,
-        renderRecursiveChrome, entryJsons,
+        renderRecursiveChrome, entryJsons, compactGlossary,
     ) {
         DictionaryRenderSignature(
             results = results, styles = styles, placeholder = placeholder, isDark = isDark,
@@ -158,6 +159,7 @@ fun DictionaryEntryWebView(
                 wordAudioEnabled = wordAudioEnabled,
                 showNavigationButtons = showNavigationButtons,
                 groupPitches = groupPitches,
+                compactGlossary = compactGlossary,
             )
             val entries = entryJsons ?: buildResultEntryJsonStrings(results, activeProfile, context, groupPitches)
             config.toString() to entries
@@ -170,11 +172,12 @@ fun DictionaryEntryWebView(
         entryJsonsPair = builtEntryJsons to renderSignature
     }
 
-    val bootstrapHtml = remember(context, isDark, isAmoled, seedColor, colorScheme, fontFamily, eInkMode, paginatedScrolling, paginatedScrollStepSize, scrollBehavior, activeProfile.languageCode) {
+    val bootstrapHtml = remember(context, isDark, isAmoled, seedColor, colorScheme, fontFamily, eInkMode, paginatedScrolling, paginatedScrollStepSize, scrollBehavior, activeProfile.languageCode, compactGlossary) {
         getDictionaryBootstrapHtml(
             context = context, colorScheme = colorScheme, isDark = isDark,
             isAmoled = isAmoled, seedColor = seedColor, fontFamily = fontFamily,
             eInkMode = eInkMode, paginatedScrolling = paginatedScrolling, paginatedScrollStepSize = paginatedScrollStepSize, scrollBehavior = scrollBehavior, languageCode = activeProfile.languageCode,
+            compactGlossary = compactGlossary,
         )
     }
 

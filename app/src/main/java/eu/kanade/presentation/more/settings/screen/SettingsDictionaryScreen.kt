@@ -999,6 +999,11 @@ object SettingsDictionaryScreen : SearchableSettings {
                         subtitle = stringResource(MR.strings.pref_dict_group_terms_summary),
                     ),
                     Preference.PreferenceItem.SwitchPreference(
+                        preference = dictionaryPreferences.compactGlossary(),
+                        title = "Compact glossaries",
+                        subtitle = "Show all senses inline separated by · instead of a numbered list",
+                    ),
+                    Preference.PreferenceItem.SwitchPreference(
                         preference = dictionaryPreferences.showNavigationButtons(),
                         title = stringResource(KMR.strings.pref_dict_show_navigation_buttons),
                         subtitle = stringResource(KMR.strings.pref_dict_show_navigation_buttons_summary),

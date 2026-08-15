@@ -257,6 +257,7 @@ data object DictionaryTab : Tab {
         val showPitchNumber by dictionaryPreferences.showPitchNumber().collectAsState()
         val showPitchText by dictionaryPreferences.showPitchText().collectAsState()
         val groupTerms by dictionaryPreferences.groupTerms().collectAsState()
+        val compactGlossary by dictionaryPreferences.compactGlossary().collectAsState()
         val recursiveNavMode by dictionaryPreferences.recursiveLookupMode().collectAsState()
         val popupFontSizePref by dictionaryPreferences.fontSize().collectAsState()
         val customCss by dictionaryPreferences.customCss().collectAsState()
