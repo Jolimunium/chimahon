@@ -34,8 +34,8 @@ import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.FileDownload
-import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Upload
 import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
@@ -1200,7 +1200,7 @@ fun NovelLibraryBottomActionMenu(
                                     expanded = false
                                     onSyncImport()
                                 },
-                                leadingIcon = { Icon(Icons.Outlined.FileDownload, null) },
+                                leadingIcon = { Icon(Icons.Outlined.Download, null) },
                             )
                             DropdownMenuItem(
                                 text = { Text("Export to Drive") },
@@ -1208,7 +1208,7 @@ fun NovelLibraryBottomActionMenu(
                                     expanded = false
                                     onSyncExport()
                                 },
-                                leadingIcon = { Icon(Icons.Outlined.FileUpload, null) },
+                                leadingIcon = { Icon(Icons.Outlined.Upload, null) },
                             )
                             DropdownMenuItem(
                                 text = { Text("Auto") },
