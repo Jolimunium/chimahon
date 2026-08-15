@@ -100,6 +100,7 @@ object Marker {
     const val MISC_INFO = "misc-info"
     const val POPUP_SELECTION_TEXT = "popup-selection-text"
     const val SELECTED_GLOSSARY = "selected-glossary"
+    const val SELECTED_GLOSSARY_NO_FALLBACK = "selected-glossary-no-fallback"
     const val MEDIA_NAME = "media-name"
     const val WORD_AUDIO = "word-audio"
     const val SENTENCE_AUDIO = "sentence-audio"
@@ -107,7 +108,7 @@ object Marker {
     val ALL: List<String> = listOf(
         // Core/Common
         EXPRESSION, READING, GLOSSARY, SENTENCE, SCREENSHOT, WORD_AUDIO, AUDIO,
-        SELECTED_GLOSSARY, SINGLE_GLOSSARY,
+        SELECTED_GLOSSARY, SELECTED_GLOSSARY_NO_FALLBACK, SINGLE_GLOSSARY,
 
         // Furigana
         FURIGANA, FURIGANA_PLAIN,
@@ -904,6 +905,22 @@ object AnkiCardCreator {
                 )
             } else {
                 renderMarker(Marker.GLOSSARY_FIRST, result, glossaryIndex = glossaryIndex, styles = styles, exportMedia = exportMedia)
+            }
+        }
+        Marker.SELECTED_GLOSSARY_NO_FALLBACK -> {
+            val selected = selectedDict?.takeIf { it.isNotBlank() }
+            if (selected != null) {
+                buildGlossary(
+                    result.term.glossaries,
+                    brief = false,
+                    noDictTag = false,
+                    firstOnly = false,
+                    dictionaryFilter = selected,
+                    styles = styles,
+                    exportMedia = exportMedia,
+                )
+            } else {
+                ""
             }
         }
         else -> parseDynamicMarker(marker, result, styles, exportMedia)

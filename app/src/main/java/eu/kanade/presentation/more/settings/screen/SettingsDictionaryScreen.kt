@@ -215,6 +215,7 @@ private val markerSections = listOf(
             Marker.GLOSSARY_FIRST_NO_DICT,
             Marker.GLOSSARY_FIRST_BRIEF,
             Marker.SELECTED_GLOSSARY,
+            Marker.SELECTED_GLOSSARY_NO_FALLBACK,
             Marker.SINGLE_GLOSSARY,
         ),
     ),
@@ -311,6 +312,7 @@ private val markerDisplayLabels: Map<String, String> = Marker.ALL_WITH_TODO.asso
         Marker.SENTENCE_FURIGANA_PLAIN -> "${prefix}Sentence Furigana Plain"
         Marker.POPUP_SELECTION_TEXT -> "${prefix}Popup Selection"
         Marker.SELECTED_GLOSSARY -> "${prefix}Selected Glossary"
+        Marker.SELECTED_GLOSSARY_NO_FALLBACK -> "${prefix}Selected Glossary No Fallback"
         else -> marker
     }
 }
