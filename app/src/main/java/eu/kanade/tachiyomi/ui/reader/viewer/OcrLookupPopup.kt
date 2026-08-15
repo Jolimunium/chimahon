@@ -110,6 +110,7 @@ private data class LookupFrame(
     val styles: List<chimahon.DictionaryStyle>,
     val mediaDataUris: Map<String, String>,
     val existingExpressions: Set<String>,
+    val existingCardIds: Map<String, Long> = emptyMap(),
     val entryJsons: List<String>? = null,
 )
 
@@ -363,7 +364,7 @@ fun OcrLookupPopup(
             if (ankiEnabled && orderedResults.isNotEmpty()) {
                 val uniqueExpressions = orderedResults.map { it.term.expression }.distinct()
                 scope.launch(Dispatchers.IO) {
-                    val existing = AnkiCardCreator.checkExistingCards(
+                    val existingCardIds = AnkiCardCreator.checkExistingCardIds(
                         context = context,
                         expressions = uniqueExpressions,
                         deckName = ankiDeck,
@@ -373,7 +374,10 @@ fun OcrLookupPopup(
                         val stack = lookupStackState.stack.toMutableList()
                         val frameIndex = stack.indexOfFirst { it.id == frame.id }
                         if (frameIndex >= 0) {
-                            stack[frameIndex] = stack[frameIndex].copy(existingExpressions = existing)
+                            stack[frameIndex] = stack[frameIndex].copy(
+                                existingExpressions = existingCardIds.keys,
+                                existingCardIds = existingCardIds,
+                            )
                             lookupStackState = lookupStackState.copy(stack = stack)
                         }
                         Log.i(
@@ -540,15 +544,41 @@ fun OcrLookupPopup(
             ?: (miningFrame?.sentenceOffset ?: charOffset)
 
         // Local helper to update the state, which triggers the optimized JS call via DictionaryEntryWebView
-        fun updateStatus(expression: String) {
+        fun updateStatus(expression: String, noteId: Long? = null) {
             val frame = currentFrame ?: return
             val stack = lookupStackState.stack.toMutableList()
             val frameIndex = stack.indexOfFirst { it.id == frame.id }
             if (frameIndex >= 0) {
                 val newExisting = frame.existingExpressions + expression
-                stack[frameIndex] = stack[frameIndex].copy(existingExpressions = newExisting)
+                val newCardIds = noteId?.let { frame.existingCardIds + (expression to it) } ?: frame.existingCardIds
+                stack[frameIndex] = stack[frameIndex].copy(
+                    existingExpressions = newExisting,
+                    existingCardIds = newCardIds,
+                )
                 lookupStackState = lookupStackState.copy(stack = stack)
             }
+        }
+
+        if (forceOpen) {
+            val expression = result.term.expression
+            val noteId = currentFrame?.existingCardIds?.get(expression)
+            if (noteId != null) {
+                chimahon.anki.AnkiDroidBridge(context).guiEditNote(noteId)
+                return
+            }
+            miningScope.launch {
+                val fallbackNoteId = AnkiCardCreator.findExistingCardId(
+                    context = context,
+                    expression = expression,
+                    deckName = ankiDeck,
+                    dupScope = ankiDupScope,
+                ) ?: return@launch
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    updateStatus(expression, fallbackNoteId)
+                    chimahon.anki.AnkiDroidBridge(context).guiEditNote(fallbackNoteId)
+                }
+            }
+            return
         }
 
         val shouldUseCropMode = screenshotFieldMapped && cropMode == "crop" && onCropTriggered != null
@@ -590,17 +620,17 @@ fun OcrLookupPopup(
                     withContext(kotlinx.coroutines.Dispatchers.Main) {
                         when (ankiResult) {
                             is AnkiResult.Success -> {
-                                updateStatus(result.term.expression)
+                                updateStatus(result.term.expression, ankiResult.noteId)
                                 onAnkiMediaWarnings(ankiResult.mediaWarnings)
                                 dismissPopup()
                                 onCropTriggered.invoke(ankiResult.noteId, glossaryIndex)
                             }
                             is AnkiResult.CardExists -> {
-                                updateStatus(result.term.expression)
+                                updateStatus(result.term.expression, ankiResult.noteId)
                                 context.toast(MR.strings.anki_card_exists)
                             }
                             is AnkiResult.OpenCard -> {
-                                updateStatus(result.term.expression)
+                                updateStatus(result.term.expression, ankiResult.noteId)
                                 chimahon.anki.AnkiDroidBridge(context).guiEditNote(ankiResult.noteId)
                             }
                             else -> {}
@@ -669,16 +699,16 @@ fun OcrLookupPopup(
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
                     when (ankiResult) {
                         is AnkiResult.Success -> {
-                            updateStatus(result.term.expression)
+                            updateStatus(result.term.expression, ankiResult.noteId)
                             onAnkiMediaWarnings(ankiResult.mediaWarnings)
                             context.toast(MR.strings.anki_card_added)
                         }
                         is AnkiResult.CardExists -> {
-                            updateStatus(result.term.expression)
+                            updateStatus(result.term.expression, ankiResult.noteId)
                             context.toast(MR.strings.anki_card_exists)
                         }
                         is AnkiResult.OpenCard -> {
-                            updateStatus(result.term.expression)
+                            updateStatus(result.term.expression, ankiResult.noteId)
                             chimahon.anki.AnkiDroidBridge(context).guiEditNote(ankiResult.noteId)
                         }
                         is AnkiResult.PermissionDenied -> context.toast(MR.strings.pref_anki_permission_denied)
