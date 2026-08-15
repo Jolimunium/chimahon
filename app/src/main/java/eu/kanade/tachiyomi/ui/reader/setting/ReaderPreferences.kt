@@ -123,7 +123,7 @@ class ReaderPreferences(
 
     fun ocrAutoOnDownload() = preferenceStore.getBoolean("ocr_auto_on_download", false)
 
-    fun ocrTwoFingerGestureEnabled() = preferenceStore.getBoolean("reader_ocr_two_finger_gesture", true)
+    fun ocrTwoFingerGestureEnabled() = preferenceStore.getBoolean("reader_ocr_two_finger_gesture", false)
 
     fun readerStartupDelay() = preferenceStore.getBoolean("reader_startup_delay", false)
     // Chimahon <--
