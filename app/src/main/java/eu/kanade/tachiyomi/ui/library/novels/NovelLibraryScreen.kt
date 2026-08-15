@@ -108,6 +108,7 @@ import kotlinx.coroutines.withContext
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.domain.library.model.LibraryDisplayMode
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.kmk.KMR
 import tachiyomi.i18n.sy.SYMR
 import tachiyomi.presentation.core.components.CheckboxItem
 import tachiyomi.presentation.core.components.FastScrollLazyColumn
@@ -763,6 +764,10 @@ fun Screen.NovelLibraryScreen(
                                 pref = screenModel.showTabs(),
                             )
                             CheckboxItem(
+                                label = stringResource(KMR.strings.action_show_hidden_categories),
+                                pref = screenModel.showHiddenCategories(),
+                            )
+                            CheckboxItem(
                                 label = stringResource(MR.strings.action_display_show_number_of_items),
                                 pref = screenModel.showNumberOfItems(),
                             )
@@ -880,7 +885,7 @@ fun NovelLibraryContent(
                         name = name,
                         order = it.order.toLong(),
                         flags = it.flags,
-                        hidden = false,
+                        hidden = it.hidden,
                     )
                 },
                 pagerState = pagerState,
