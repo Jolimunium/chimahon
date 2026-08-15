@@ -5,6 +5,7 @@ import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.core.preference.PreferenceMutableState
 import eu.kanade.core.preference.asState
+import eu.kanade.domain.sync.SyncPreferences
 import eu.kanade.presentation.entries.DownloadAction
 import eu.kanade.presentation.library.components.LibraryToolbarTitle
 import eu.kanade.tachiyomi.animesource.model.SAnime
@@ -80,6 +81,7 @@ class AnimeLibraryScreenModel(
     private val coverCache: AnimeCoverCache = Injekt.get(),
     private val backgroundCache: AnimeBackgroundCache = Injekt.get(),
     private val trackerManager: TrackerManager = Injekt.get(),
+    private val syncPreferences: SyncPreferences = Injekt.get(),
 ) : StateScreenModel<AnimeLibraryScreenModel.State>(
     State(activeCategoryIndex = preferences.lastUsedCategory().get()),
 ) {
@@ -207,6 +209,14 @@ class AnimeLibraryScreenModel(
         preferences.showContinueWatchingButton().changes()
             .onEach { show ->
                 mutableState.update { it.copy(showContinueWatchingButton = show) }
+            }
+            .launchIn(screenModelScope)
+
+        syncPreferences.syncService()
+            .changes()
+            .distinctUntilChanged()
+            .onEach { syncService ->
+                mutableState.update { it.copy(isSyncEnabled = syncService != 0) }
             }
             .launchIn(screenModelScope)
 
@@ -672,6 +682,7 @@ class AnimeLibraryScreenModel(
         val showCategoryTabs: Boolean = true,
         val showAnimeCount: Boolean = false,
         val showContinueWatchingButton: Boolean = false,
+        val isSyncEnabled: Boolean = false,
         val dialog: Dialog? = null,
         private val activeCategoryIndex: Int = 0,
     ) {
