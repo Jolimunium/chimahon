@@ -320,7 +320,7 @@ body {
 }
 
 .dictionary-group[data-collapsed="true"] .definition-list {
-  display: none;
+  display: none !important;
 }
 
 /* ── Deinflection Row ────────────────────────────────── */

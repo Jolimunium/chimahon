@@ -544,6 +544,7 @@ private fun OcrQueueItemRow(
                     )
                 }
             }
+        }
         if (item.status in
             listOf(
                 OcrQueueStatus.PENDING,
