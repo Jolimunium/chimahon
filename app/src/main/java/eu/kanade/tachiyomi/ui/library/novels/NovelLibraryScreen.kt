@@ -273,7 +273,8 @@ fun Screen.NovelLibraryScreen(
                             context.toast(SYMR.strings.sync_in_progress)
                         }
                     },
-                    onClickSyncNow = { syncAllTtuBooks() },
+                    onClickSyncNow = null,
+                    onClickSyncTtu = { syncAllTtuBooks() }.takeIf { ttuSyncManager?.isEnabled == true },
                 onClickGlobalUpdate = null,
                 onClickOpenRandomManga = {
                     val randomBook = screenModel.getRandomBookForCurrentCategory()
@@ -283,7 +284,7 @@ fun Screen.NovelLibraryScreen(
                     }
                 },
                 onClickSyncExh = null,
-                isSyncEnabled = true,
+                isSyncEnabled = false,
                 searchQuery = state.searchQuery,
                 onSearchQueryChange = screenModel::search,
                 scrollBehavior = scrollBehavior,
