@@ -24,9 +24,9 @@ class ReaderPreferences(
     fun pageTransitionsWebtoon() = preferenceStore.getBoolean("pref_enable_transitions_webtoon_key", true)
     // SY <--
 
-    fun flashOnPageChange() = preferenceStore.getBoolean("pref_reader_flash", false)
+    fun flashOnPageChange() = preferenceStore.getBoolean(Preference.appStateKey("pref_reader_flash"), false)
 
-    fun flashOnScroll() = preferenceStore.getBoolean("pref_reader_flash_on_scroll", false)
+    fun flashOnScroll() = preferenceStore.getBoolean(Preference.appStateKey("pref_reader_flash_on_scroll"), false)
 
     fun flashDurationMillis() = preferenceStore.getInt("pref_reader_flash_duration", MILLI_CONVERSION)
 
@@ -36,7 +36,7 @@ class ReaderPreferences(
 
     fun flashColor() = preferenceStore.getEnum("pref_reader_flash_mode", FlashColor.BLACK)
 
-    fun eInkMode() = preferenceStore.getBoolean("pref_reader_eink_swipe", false)
+    fun eInkMode() = preferenceStore.getBoolean(Preference.appStateKey("pref_reader_eink_swipe"), false)
 
     fun doubleTapAnimSpeed() = preferenceStore.getInt("pref_double_tap_anim_speed", 500)
 

@@ -4,6 +4,7 @@ import chimahon.anki.AnkiProfile
 import chimahon.anki.AnkiProfileStore
 import chimahon.audio.WordAudioPreferences
 import chimahon.dictionary.ko.KoreanParserMode
+import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.preference.getEnum
 
@@ -102,7 +103,7 @@ class DictionaryPreferences(
     }
     fun customColor() = preferenceStore.getInt("pref_dictionary_custom_color", 0)
 
-    fun eInkMode() = preferenceStore.getBoolean("pref_dictionary_eink_mode", false)
+    fun eInkMode() = preferenceStore.getBoolean(Preference.appStateKey("pref_dictionary_eink_mode"), false)
 
     fun paginatedScrolling() = preferenceStore.getBoolean("pref_dictionary_paginated_scrolling", false)
 
